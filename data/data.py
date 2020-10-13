@@ -12,7 +12,7 @@ from PIL import Image
 parser = argparse.ArgumentParser(description='Dataset')
 
 parser.add_argument('--download', type=bool, default=False)
-parser.add_argument('--root', type=str, default=os.getcwd())
+parser.add_argument('--root', type=str, default=os.getcwd()+'databases/')
 parser.add_argument('--use_database', type=str, default='CIFAR10')
 parser.add_argument('--task', type=str, default='train')
 parser.add_argument('--batchsize', type=int, default=2)
