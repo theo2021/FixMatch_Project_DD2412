@@ -54,8 +54,8 @@ print(database.__getitem__(0))
 '''
 
 class Dataloader(torch.utils.data.Dataset):
-	def __init__(self, download = True, transform = None, db_name = 'CIFAR10', db_dir = None, mode = 'train'):
-		self.transform = transform
+	def __init__(self, download = True, db_name = 'CIFAR10', db_dir = None, mode = 'train'):
+		self.transform = None
 		self.db_name = db_name
 		self.database = None
 		self.db_dir = db_dir
@@ -92,8 +92,11 @@ class Dataloader(torch.utils.data.Dataset):
 
 
 	def __getitem__(self, index):
-	        
 		self.databse = self.loader[index]
+
+		print('debug')
+		print(self.database.shape)
+
 	        im_pil = self.database[0]
 		im_label = self.database[1]
 
@@ -114,7 +117,6 @@ class Augmentation(Dataloader):
 
 	def weak_augment(self, visualize = False):
 
-		
 		if visualize == True:
 			self.transform = = torchvision.transforms.Compose([
 					        torchvision.transforms.RandomHorizontalFlip(),
@@ -130,9 +132,9 @@ class Augmentation(Dataloader):
                                             ])
 
 
-	#def rand_augment(self, visualize = False):
+	def rand_augment(self, visualize = False):
 
-	#def ctaugment(self, visualize = False):
+	def ctaugment(self, visualize = False):
 
 
 '''
@@ -163,7 +165,7 @@ class Augmented_Dataset(data.Dataset):
 		self.db_dict = db_dict
 		self.transform = transform
 		self.forget_labels = forget_labels
-		
+
 	def __getitem__(self, index):
 	'Generates one sample of data'
 
@@ -184,4 +186,9 @@ class Augmented_Dataset(data.Dataset):
 #train_loader = DataLoader(database, batch_size=args.batchsize, shuffle=True, pin_memory=False, num_workers=2)
 
 
-'''	
+'''
+
+
+augmented_dataset = Augmentation().weak_augment(visualize = True, db_dir = args.root, db_name = args.use_database, mode = args.task, download = args.download)
+
+print(augmented_dataset.__getitem__(0))
