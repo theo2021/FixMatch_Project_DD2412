@@ -112,7 +112,27 @@ class Augmentation(Dataloader):
 		super().__init__()
 		self.aug_type = aug_type
 
+	def weak_augment(self, visualize = False):
 
+		
+		if visualize == True:
+			self.transform = = torchvision.transforms.Compose([
+					        torchvision.transforms.RandomHorizontalFlip(),
+					        torchvision.transforms.RandomAffine(0, translate=(0.1, 0.1), shear=10, scale=(0.85, 1.15), fillcolor=0),
+						TransformShow(),
+					        torchvision.transforms.ToTensor(),
+					    ])
+		else:
+                        self.transform = = torchvision.transforms.Compose([
+                                                torchvision.transforms.RandomHorizontalFlip(),
+                                                torchvision.transforms.RandomAffine(0, translate=(0.1, 0.1), shear=10, scale=(0.85, 1.15), fillcolor=0),
+                                                torchvision.transforms.ToTensor(),
+                                            ])
+
+
+	#def rand_augment(self, visualize = False):
+
+	#def ctaugment(self, visualize = False):
 
 
 '''
