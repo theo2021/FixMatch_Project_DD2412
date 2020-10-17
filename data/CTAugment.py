@@ -6,52 +6,71 @@ import torchvision
 import tensorflow as tf
 import numpy as np
 
-class CTAugment():
+class CTAugment:
     '''
     This method is called during training
     '''
 
-    def __init__(self, nll):
-        self.exp_decay_hyperpar = 0.99
-        self.nll = nll
+    def __init__(self, depth = 1, num_filters = 2):
         self.transform = None
+        self.filter_samples = None
+        self.depth = depth
+        self.exp_decay_hyperpar = 0.99
+        self.m = np.ones(num_filters)
+        self.filter_dict = {}
+        self.bins = np.zeros(num_filters)
 
-    def magnitude_bins(self):
-        bins = {}
+    def decay_hyperpar_anneal(self, update_step, total_steps, a = 1):
+        self.exp_decay_hyperpar *=  np.exp(-a*(update_step/total_steps))
 
-        return bins
+    def magnitude_bins(self, loss):
+        self.bins = self.exp_decay_hyperpar * self.m + (1 - self.exp_decay_hyperpar) * loss
 
-    def add_filter(self, pytorch_filter_name):
-        filter_dict = {}
-        return filter_dict
+    def add_filter(self):
+        self.filter_dict = {
+            0 : torchvision.transforms.RandomHorizontalFlip(),
+            1 : torchvision.transforms.RandomAffine(translate=(0.125, 0.125))
+        }
 
-    def get_filter(self):
+
+
+
+
+
+    def all_filter(self):
         '''
-
         get filter dictionary to retrive torch filter applied with magnitude
         '''
 
-        filter_set_choice = {}
+        chosen_filters = []
+        for idx in range(len(self.filter_samples)):
+            categ = self.filter_samples[idx]
+            if categ > 0:
+                for idx in range(categ):
+                    chosen_filters.append(
+                        self.filter_dict[idx](
+                            self.bins
+                        )
+                    )
+        return chosen_filters
 
-        return filter_set_choice
 
-
-    def all_filters(self, params):
+    def get_filters(self):
         '''
-        sample 2 filters from 17 kinds randomly and copose a transformation with that
+        sample 2 filters from 17 kinds randomly and compose a transformation with that
         '''
 
-        filter_samples = np.random.randint(0,17,2) # 17 kinds of filter
+        self.filter_samples = None
 
-        transform = torchvision.transforms.Compose([
-                    self.get_filter[filter_samples[0]],
-                    self.get_filter[filter_samples[1]],
+        m_hat = self.bins * (self.bins > 0.8)
+
+        self.filter_samples = np.random.multinomial(n=self.depth, pvals = m_hat/np.sum(m_hat))
+
+        self.transform = torchvision.transforms.Compose([
+                    self.all_filter[0],
+                    self.all_filter[1],
                     torchvision.transforms.ToTensor(),
                     ])
-        return transform
-
-
-    def decision(self):
 
 
     def apply_aug(self, input_PIL_img):
@@ -66,8 +85,16 @@ class CTAugment():
         else:
             transformer_tf = tf.ToTensor()
             X = transformer_tf(input_PIL_img)
+        return X
 
 
+### EXAMPLE USE
 
+#ctaugment = CTAugment()
+#ctaugment.decay_hyperpar_anneal(<actual timestep> , <total timestep>)
+#ctaugment.magnitude_bins(<loss from train>)
+#ctaugment.add_filter()
+#ctaugment.get_filters()
+#ctaugment.apply_aug(<desired image to be augmented>)
 
 
