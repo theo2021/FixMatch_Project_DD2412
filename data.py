@@ -8,7 +8,8 @@ from torchvision.datasets import ImageFolder
 from torch.utils import data
 from PIL import Image
 from torchvision import transforms
-import cv2
+import cv2, random, functools
+from collections import defaultdict
 
 
 parser = argparse.ArgumentParser(description='Dataset')
@@ -39,31 +40,39 @@ class DataSet(torch.utils.data.Dataset):
         self.download = download
 
 
-    def loader(self):
-        print('inside loader')
+    def load(self):
         if self.db_name == 'CIFAR10':
-
             if self.mode == 'train':
                 self.database = torchvision.datasets.CIFAR10(self.db_dir, train=True, transform=None, target_transform=None, download=self.download)
-
             elif self.mode == 'test':
                 self.database = torchvision.datasets.CIFAR10(self.db_dir, train=False, transform=None, target_transform=None, download=self.download)
 
         elif self.db_name == 'CIFAR100':
-
             if self.mode == 'train':
                 self.database = torchvision.datasets.CIFAR100(self.db_dir, train=True, transform=None, target_transform=None, download=self.download)
-
             elif self.mode == 'test':
                 self.database = torchvision.datasets.CIFAR100(self.db_dir, train=False, transform=None, target_transform=None, download=self.download)
 
         elif self.db_name == 'SVHN':
-
             if self.mode == 'train':
                 self.database = torchvision.datasets.SVHN(self.db_dir, split='train', transform=None, target_transform=None, download=self.download)
-
             elif self.mode == 'test':
                 self.database = torchvision.datasets.SVHN(self.db_dir, split='test', transform=None, target_transform=None, download=self.download)
+
+        self.__init_labels()
+
+    def __init_labels(self):
+        lbls = defaultdict(list)
+        for i,(im, lbl) in enumerate(self.database):
+            lbls[lbl].append(i)
+
+        label_set = [random.sample(lbls[lbl], self.labels_per_class[lbl]) for lbl in lbls]
+
+        label_set = set(functools.reduce(lambda a, b : a+b, label_set))
+
+        assert len(label_set) == functools.reduce(lambda a, b : a + b, self.labels_per_class)
+        
+        self.label_set = label_set
 
     def __getitem__(self, index):
 
@@ -82,13 +91,13 @@ class DataSet(torch.utils.data.Dataset):
      
         y = torch.tensor(im_label, dtype=torch.long)
 
-        return X, y
+        return X, y, index in self.label_set
 
     def __len__(self):
         return len(self.database)
 
     def visualize(self, index):
-        X, y = self[index]
+        X, y, has_label = self[index]
         X = cv2.cvtColor(cv2.resize(X.numpy().transpose(1,2,0), (256, 256)), cv2.COLOR_BGR2RGB)
         cv2.imshow('t', X)
         cv2.waitKey()
@@ -100,7 +109,7 @@ class DataSet(torch.utils.data.Dataset):
 
 
 class Augmentation(DataSet):
-    def __init__(self,  download = True, db_name = 'CIFAR10', db_dir = None, mode = 'train', aug_type = 'weak'):
+    def __init__(self,  labels_per_class, download = True, db_name = 'CIFAR10', db_dir = None, mode = 'train', aug_type = 'weak'):
         super().__init__(download, db_name, db_dir, mode)
         self.aug_type = aug_type
 
@@ -111,8 +120,8 @@ class Augmentation(DataSet):
         return transforms
 
     def __getitem__(self, i):
-        X, y = self.database[i]#super().__getitem__(i)
-        return self.weak_augment()(X), y
+        X, y, has_label = self.database[i]#super().__getitem__(i)
+        return self.weak_augment()(X), y, index in self.label_set
 
 
 #def rand_augment(self, visualize = False):
@@ -136,10 +145,11 @@ transforms.ToTensor()
 #train_loader = DataLoader(database, batch_size=args.batchsize, shuffle=True, pin_memory=False, num_workers=2)
 '''
 
+labels_per_class  = [10 for _ in range(10)]
 
-augmented_dataset = DataSet(db_dir = args.root, db_name = args.use_database, mode = args.task, download = args.download)
+augmented_dataset = DataSet(labels_per_class = labels_per_class, db_dir = args.root, db_name = args.use_database, mode = args.task, download = args.download)
 
-augmented_dataset.loader()
+augmented_dataset.load()
 augmented_dataset.visualize(3)
 
 #print(augmented_dataset.__getitem__(0))
