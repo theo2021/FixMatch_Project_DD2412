@@ -1,5 +1,7 @@
 #This code is inspired by https://github.com/google-research/remixmatch/blob/master/libml/ctaugment.py
 
+
+
 import torch
 #from data import Dataloader
 import torchvision
@@ -32,11 +34,6 @@ class CTAugment:
             1 : torchvision.transforms.RandomAffine(translate=(0.125, 0.125))
         }
 
-
-
-
-
-
     def all_filter(self):
         '''
         get filter dictionary to retrive torch filter applied with magnitude
@@ -54,7 +51,6 @@ class CTAugment:
                     )
         return chosen_filters
 
-
     def get_filters(self):
         '''
         sample 2 filters from 17 kinds randomly and compose a transformation with that
@@ -71,7 +67,6 @@ class CTAugment:
                     self.all_filter[1],
                     torchvision.transforms.ToTensor(),
                     ])
-
 
     def apply_aug(self, input_PIL_img):
         '''
