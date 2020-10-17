@@ -3,18 +3,19 @@ import argparse
 import torchvision
 #from tfds.features import FeaturesDict
 import torch
-from torch.utils.data import DataLoader
+#from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
 from torch.utils import data
 from PIL import Image
 from torchvision import transforms
 import cv2, random, functools
 from collections import defaultdict
-
+from math import ceil
+import numpy as np
 
 parser = argparse.ArgumentParser(description='Dataset')
 
-parser.add_argument('--download', type=bool, default=False)
+parser.add_argument('--download', type=bool, default=True)
 parser.add_argument('--root', type=str, default=os.getcwd()+'databases/')
 parser.add_argument('--use_database', type=str, default='CIFAR10')
 parser.add_argument('--task', type=str, default='train')
@@ -26,6 +27,29 @@ args = parser.parse_args()
 #https://www.cs.toronto.edu/~kriz/cifar.html
 #http://ufldl.stanford.edu/housenumbers/
 
+
+class DataLoader:
+    def __init__(self, dataset, B, mu, num_classes, K):
+        self.dataset      = dataset
+        self.B            = B
+        self.mu           = mu
+        self.num_classes  = num_classes
+        self.K = K
+
+    def __iter__(self):
+        for i in range(self.K):
+            yield self[i]
+
+    def __getitem__(self, i):
+        
+
+        unlabled_images = self.dataset.get_set(random.sample(self.dataset.unlabeled_set, self.mu*self.B))
+        labeled_images  = self.dataset.get_set(random.sample(self.dataset.labeled_set, self.B))
+
+        unlabeled_batch = [im for im, _, _ in unlabled_images]
+        labeled_batch, labels = [im for im, _, _ in labeled_images], [lbl for _, lbl, _ in labeled_images]
+        
+        return unlabeled_batch, labeled_batch, labels
 
 
 
@@ -61,6 +85,14 @@ class DataSet(torch.utils.data.Dataset):
 
         self.__init_labels()
 
+    def get_set(self, idxs):
+        '''
+        idxs a collection of indexes into self
+
+        returns a collection of images
+        '''
+        return [self[i] for i in idxs]
+
     def __init_labels(self):
         lbls = defaultdict(list)
         for i,(im, lbl) in enumerate(self.database):
@@ -72,16 +104,13 @@ class DataSet(torch.utils.data.Dataset):
 
         assert len(label_set) == functools.reduce(lambda a, b : a + b, self.labels_per_class)
         
-        self.label_set = label_set
+        self.labeled_set    = label_set
+        self.unlabeled_set = set([x for x in range(len(self))]) - self.labeled_set 
 
     def __getitem__(self, index):
 
-        print('inside get item')
-
         image = self.database[index]
-
-        print('debug')
-
+    
         im_pil = image[0]
         im_label = image[1]
 
@@ -91,7 +120,7 @@ class DataSet(torch.utils.data.Dataset):
      
         y = torch.tensor(im_label, dtype=torch.long)
 
-        return X, y, index in self.label_set
+        return X, y, index in self.labeled_set
 
     def __len__(self):
         return len(self.database)
@@ -121,35 +150,19 @@ class Augmentation(DataSet):
 
     def __getitem__(self, i):
         X, y, has_label = self.database[i]#super().__getitem__(i)
-        return self.weak_augment()(X), y, index in self.label_set
+        return self.weak_augment()(X), y, i in self.labeled_set
 
+if __name__ == "__main__":
+   
+    labels_per_class  = [10 for _ in range(10)]
 
-#def rand_augment(self, visualize = False):
+    dataset = DataSet(labels_per_class = labels_per_class, db_dir = args.root, db_name = args.use_database, mode = args.task, download = args.download)
 
-#def ctaugment(self, visualize = False):
+    dataset.load()
 
+    loader = DataLoader(dataset, B= 64, mu=7, num_classes=10, K=3)
 
-'''
-strong_augmentation  = transforms.Compose([
-#transforms.Resize(32),  # rescale the image keeping the original aspect ratio
-#transforms.CenterCrop(32),  # we get only the center of that rescaled
-#transforms.RandomCrop(32),  # random crop within the center crop (data augmentation)
-transforms.ColorJitter(brightness=(0.9, 1.1)),
-transforms.RandomRotation((-10, 10)),
-transforms.RandomHorizontalFlip(),
-transforms.RandomAffine(0, translate=(0.1, 0.1), shear=10, scale=(0.85, 1.15), fillcolor=0),
-# TransformShow(), # visualize transformed pic
-transforms.ToTensor()
-])
+    for (ub, b, lbl) in loader:
+        print(len(ub), len(b), len(lbl))
 
-#train_loader = DataLoader(database, batch_size=args.batchsize, shuffle=True, pin_memory=False, num_workers=2)
-'''
-
-labels_per_class  = [10 for _ in range(10)]
-
-augmented_dataset = DataSet(labels_per_class = labels_per_class, db_dir = args.root, db_name = args.use_database, mode = args.task, download = args.download)
-
-augmented_dataset.load()
-augmented_dataset.visualize(3)
-
-#print(augmented_dataset.__getitem__(0))
+    #print(augmented_dataset.__getitem__(0))
