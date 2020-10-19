@@ -3,7 +3,7 @@ import argparse
 import torchvision
 #from tfds.features import FeaturesDict
 import torch
-from torch.utils.data import DataLoader
+#from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
 from torch.utils import data
 from PIL import Image
@@ -13,7 +13,6 @@ from collections import defaultdict
 from math import ceil
 import numpy as np
 from ctaugment import CTAugment, apply
-import time
 
 parser = argparse.ArgumentParser(description='Dataset')
 
@@ -34,14 +33,6 @@ class Augmentation:
         self.cta = CTAugment()
         self.weak = self.__weak()
 
-    def weak_batch(self, x):
-        return [(self.weak(im[0]), im[1]) for im in x]
-    
-    def strong_batch(self, x):
-        policy = self.cta.policy(True)
-
-        return ([(apply(np.array(im[0]), policy), (im[1], policy)) for im in x])
-
     def strong(self, x):
         policy = self.cta.policy(True)
 
@@ -56,8 +47,7 @@ class Augmentation:
                      torchvision.transforms.ToTensor()])
 
         return transforms
-
-class CustomDataLoader(DataLoader):
+class DataLoader:
     def __init__(self, dataset, B, mu, num_classes, K):
         self.dataset      = dataset
         self.B            = B
@@ -71,6 +61,7 @@ class CustomDataLoader(DataLoader):
 
     def __getitem__(self, i):
         
+
         unlabled_images = self.dataset.get_set(random.sample(self.dataset.unlabeled_set, self.mu*self.B))
         labeled_images  = self.dataset.get_set(random.sample(self.dataset.labeled_set, self.B))
 
@@ -81,19 +72,15 @@ class CustomDataLoader(DataLoader):
 
 
 
-class CustomLoader:
+class DataSet(torch.utils.data.Dataset):
 
-    def __init__(self, labels_per_class, download = True, db_name = 'CIFAR10', db_dir = None, mode = 'train', augmentation = None):
+    def __init__(self, labels_per_class, download = True, db_name = 'CIFAR10', db_dir = None, mode = 'train'):
         self.labels_per_class = labels_per_class
         self.db_name = db_name
         self.database = None
         self.db_dir = db_dir
         self.mode = mode
         self.download = download
-        self.augmentation = augmentation
-
-        if self.augmentation == None:
-            self.augmentation = lambda x : x #set to identity
 
 
     def load(self):
@@ -120,7 +107,6 @@ class CustomLoader:
     def get_set(self, idxs):
         '''
         idxs a collection of indexes into self
-
         returns a collection of images
         '''
         return [self[i] for i in idxs]
@@ -146,8 +132,13 @@ class CustomLoader:
         im_pil = image[0]
         im_label = image[1]
 
+
+        #transformer_tf = tf.ToTensor()
+        #X =  torchvision.transforms.ToTensor()(im_pil)
+     
+        #y = torch.tensor(im_label, dtype=torch.long)
         X, y = im_pil, im_label
-        return X, y
+        return X, y, index in self.labeled_set
 
     def __len__(self):
         return len(self.database)
@@ -162,23 +153,21 @@ class CustomLoader:
 
 
 
-class DataSet(torch.utils.data.Dataset):
-    def __init__(self, dataset):
-        self.database = dataset
-        
 
-    def __getitem__(self, index):
-        #index %= len(self.database)
-        image = self.database[index]
-    
-        im_pil = image[0]
-        im_label = image[1]
-
-        X, y = im_pil, im_label
-        return X, y
-
-    def __len__(self):
-        return len(self.database)
+'''
+class Augmentation(DataSet):
+    def __init__(self,  labels_per_class, download = True, db_name = 'CIFAR10', db_dir = None, mode = 'train', aug_type = 'weak'):
+        super().__init__(download, db_name, db_dir, mode)
+        self.aug_type = aug_type
+    def weak_augment(self):
+        transforms     = torchvision.transforms.Compose([torchvision.transforms.RandomHorizontalFlip(),
+                        torchvision.transforms.RandomAffine(0, translate=(0.1, 0.1), shear=10, scale=(0.85, 1.15), fillcolor=0),
+                        torchvision.transforms.ToTensor()])
+        return transforms
+    def __getitem__(self, i):
+        X, y, has_label = self.database[i]#super().__getitem__(i)
+        return self.weak_augment()(X), y, i in self.labeled_set
+'''
 
 def visualize(img):
     X = cv2.cvtColor(cv2.resize(img.transpose(1,2,0), (256, 256)), cv2.COLOR_BGR2RGB)
@@ -189,65 +178,22 @@ if __name__ == "__main__":
    
     labels_per_class  = [10 for _ in range(10)]
 
-    dataset_loader = CustomLoader(labels_per_class = labels_per_class, db_dir = args.root, db_name = args.use_database, mode = args.task, download = args.download)
+    dataset = DataSet(labels_per_class = labels_per_class, db_dir = args.root, db_name = args.use_database, mode = args.task, download = args.download)
 
-    dataset_loader.load()
+    dataset.load()
 
-    unlabeled_dataset = DataSet(dataset_loader.get_set(dataset_loader.unlabeled_set))
-    labeled_dataset   = DataSet(dataset_loader.get_set(dataset_loader.labeled_set))
+    loader = DataLoader(dataset, B= 64, mu=7, num_classes=10, K=3)
 
+    for (ub, b, lbl) in loader:
+        print(len(ub), len(b), len(lbl))
+
+
+    
+    im = dataset[0][0]
     augmentation = Augmentation()
 
-    def collate_fn_weak(ims):
-        s = augmentation.weak_batch(ims)
-        tensors, labels = [x[0] for x in s], [x[1] for x in s]
-
-        return torch.stack(tensors), torch.LongTensor(labels)
-
-
-    def collate_fn_strong(ims):
-        strong = augmentation.strong_batch(ims)
-        weak   = collate_fn_weak(ims)
-        
-        tensors, labels = [torch.tensor(x[0]) for x in strong], [x[1] for x in strong]
-        s = torch.stack(tensors)
-
-        labels, policy = [x[0] for x in labels], labels[0][1]
-
-        return s, weak[0], torch.LongTensor(labels), policy
-
-
-    lbl_loader  = DataLoader(labeled_dataset, batch_size = 64, collate_fn = collate_fn_weak)
-    ulbl_loader = DataLoader(unlabeled_dataset, batch_size = 7*64, collate_fn = collate_fn_strong, num_workers=3)
-
-    start = time.time()
-    for batch in lbl_loader:
-        weak, labels = batch
-        #strong, weak, labels, policy = batch
-
-        print(weak.shape)
-        
-    end = time.time()
-    print(end-start)
-    '''
-    #TIME TEST
-    start = time.time()
-    for (ub, b, lbl) in loader:
-        #print(ub, b)
-        X = augmentation.strong_batch(ub)
-        Y = augmentation.weak_batch(b)
-    end = time.time()
-    print((((end - start)/loader.K) *2**20)/(60*60), 'h' )
-
-    #print(X)
-    '''
-
-
-    
-    
-
-    #visualize(augmentation.weak(im).numpy())
-    #visualize(augmentation.strong(np.array(im))[0])
+    visualize(augmentation.weak(im).numpy())
+    visualize(augmentation.strong(np.array(im))[0])
     
 
 
