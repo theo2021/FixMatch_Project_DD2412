@@ -8,10 +8,11 @@ from scheduler.cosineLRreduce import cosineLRreduce
 from torch.nn import functional as F
 from data.data import DataSet, Augmentation, CustomLoader
 from torch.utils.data import DataLoader
+import numpy as np
 
 parser = argparse.ArgumentParser(description='Dataset')
 parser.add_argument('--download', type=bool, default=True)
-parser.add_argument('--root', type=str, default='/home/theo/databases/')
+parser.add_argument('--root', type=str, default='/home/databases/') #sudo mkdir /home/databases and then sudo chmod -R 777 /home/databases (for permissions) 
 parser.add_argument('--use_database', type=str, default='CIFAR10')
 parser.add_argument('--task', type=str, default='train')
 parser.add_argument('--batchsize', type=int, default=2)
@@ -37,13 +38,14 @@ class fixmatchloss():
         return supervised + self.u_weight * unsupervised
 
 
-def train_fixmatch(model, trainloader, augmentation, optimizer, scheduler, device, K):
+def train_fixmatch(model, trainloader, validation_loader, augmentation, optimizer, scheduler, device, K):
     lossfunc = fixmatchloss()
+    run_validation = 100
     with tqdm(total=K) as bar:
-        for label_load, ulabel_load in trainloader:
+        for i, (label_load, ulabel_loader) in enumerate(trainloader):
             #  Unpacking variables
             x_strong, x_weak, x_labels, x_policy = label_load
-            u_strong, u_weak, u_labels, u_policy = ulabel_load
+            u_strong, u_weak, u_labels, u_policy = ulabel_loader
             model.train()
             optimizer.zero_grad()
             labeled_predictions = model(x_weak)  # weak
@@ -61,6 +63,18 @@ def train_fixmatch(model, trainloader, augmentation, optimizer, scheduler, devic
                 mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1))
                 augmentation.update(x_policy, 1 - 0.5*mae)
             bar.update(1)
+
+            if i % run_validation == 0:
+                correct, total = 0, 0
+                with torch.no_grad(): #Turn off gradients
+                    for X, Y in validation_loader:
+                        y = np.argmax(model(X).numpy(), axis=1) == Y.numpy()
+                        total += len(y)
+                        correct = np.sum(y)
+
+                    print('Validation on iteration k={0} yielded {1} accuracy'.format(i, correct/total))
+
+                
 
 def collate_fn_weak(ims):
     s = augmentation.weak_batch(ims)
@@ -81,6 +95,15 @@ def collate_fn_strong(ims):
     return s, weak[0], torch.LongTensor(labels), policy #, augmentation.cta.rates['autocontrast'][0]
 
 
+def default_collate_fn(ims):
+    
+    tensors, labels = [torch.FloatTensor(np.array(x[0]).transpose(2, 0, 1)) for x in ims], [x[1] for x in ims]
+
+    s = torch.stack(tensors)
+
+    return s, torch.LongTensor(labels)
+
+
 if __name__ == "__main__":
     from models.wideresnet import WideResNet
     import torch
@@ -97,12 +120,14 @@ if __name__ == "__main__":
 
     unlabeled_dataset = DataSet(dataset_loader.get_set(dataset_loader.unlabeled_set), batch=B*mu, steps=K)
     labeled_dataset   = DataSet(dataset_loader.get_set(dataset_loader.labeled_set), batch=B, steps=K)
+    unlabeled_dataset, validation_dataset = unlabeled_dataset.split(p=0.9)
 
     # Creating Data Loaders
-
     augmentation = Augmentation()
     lbl_loader  = DataLoader(labeled_dataset, batch_size = B, collate_fn = collate_fn_strong, num_workers=1)
     ulbl_loader = DataLoader(unlabeled_dataset, batch_size = mu*B, collate_fn = collate_fn_strong, num_workers=3)
+    v_loader    = DataLoader(validation_dataset, batch_size = (mu + 1)*B, collate_fn = default_collate_fn, num_workers=1)
+
 
     #  Model Settings
 
@@ -112,7 +137,7 @@ if __name__ == "__main__":
     optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
     scheduler = cosineLRreduce(optimizer, K)
 
-    train_fixmatch(model,zip(lbl_loader, ulbl_loader), augmentation, optimizer, scheduler, device, K)
+    train_fixmatch(model,zip(lbl_loader, ulbl_loader), v_loader, augmentation, optimizer, scheduler, device, K)
 
 
 

@@ -18,7 +18,7 @@ import time
 parser = argparse.ArgumentParser(description='Dataset')
 
 parser.add_argument('--download', type=bool, default=True)
-parser.add_argument('--root', type=str, default='/home/theo/databases/')
+parser.add_argument('--root', type=str, default='/home/databases')
 parser.add_argument('--use_database', type=str, default='CIFAR10')
 parser.add_argument('--task', type=str, default='train')
 parser.add_argument('--batchsize', type=int, default=2)
@@ -165,6 +165,8 @@ class CustomLoader:
 class DataSet(torch.utils.data.Dataset):
     def __init__(self, dataset, batch=1, steps=None):
         self.database = dataset
+        self.steps = steps
+        self.batch = batch
         self.len = batch * (steps if steps is not None else len(dataset))
         
 
@@ -177,6 +179,22 @@ class DataSet(torch.utils.data.Dataset):
 
         X, y = im_pil, im_label
         return X, y
+
+    def split(self, p, seed = 42):
+        '''
+        Split into two datasets given proportion p
+
+        return length p * len(self) and (1-p) * len(self) DISJOINT datasets
+        '''
+        np.random.seed(seed)
+        
+        sample_space = [x for x in range(len(self.database))]
+        left_ds  = set(random.sample(sample_space, int(p*len(self.database))))
+        right_ds = set(sample_space) - left_ds
+
+
+        return DataSet([self.database[i] for i in left_ds], batch = self.batch, steps = self.steps), DataSet([self.database[i] for i in right_ds])
+
 
     def __len__(self):
         return self.len
