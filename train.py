@@ -6,7 +6,7 @@ import argparse
 # from torchvision.transforms import ToTensor
 from scheduler.cosineLRreduce import cosineLRreduce
 from torch.nn import functional as F
-from data.data import DataSet, Augmentation, collate_fn_weak, collate_fn_strong, CustomLoader
+from data.data import DataSet, Augmentation, CustomLoader
 from torch.utils.data import DataLoader
 
 parser = argparse.ArgumentParser(description='Dataset')
@@ -42,21 +42,43 @@ def train_fixmatch(model, trainloader, augmentation, optimizer, scheduler, devic
     with tqdm(total=K) as bar:
         for label_load, ulabel_load in trainloader:
             #  Unpacking variables
-            labeled_samples, labeled_targets = label_load
-            u_strong, u_weak, u_labels, policy = ulabel_load
+            x_strong, x_weak, x_labels, x_policy = label_load
+            u_strong, u_weak, u_labels, u_policy = ulabel_load
+            model.train()
             optimizer.zero_grad()
-            labeled_predictions = model(labeled_samples)  # weak
-            unlabeled_predictions = model(u_weak)
+            labeled_predictions = model(x_weak)  # weak
+            with torch.no_grad():
+                unlabeled_predictions = model(u_weak)
             unlabeled_strong_predictions = model(u_strong)
-            loss = lossfunc(labeled_predictions, labels, unlabeled_predictions, unlabeled_strong_predictions)
+            loss = lossfunc(labeled_predictions, x_labels, unlabeled_predictions, unlabeled_strong_predictions)
             loss.backward()
             optimizer.step()
             scheduler.step()
             # CT augment update
-            
+            model.eval()
+            with torch.no_grad():
+                pred = model(x_strong).softmax(1)
+                mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1))
+                augmentation.update(x_policy, 1 - 0.5*mae)
             bar.update(1)
 
+def collate_fn_weak(ims):
+    s = augmentation.weak_batch(ims)
+    tensors, labels = [x[0] for x in s], [x[1] for x in s]
 
+    return torch.stack(tensors), torch.LongTensor(labels)
+
+def collate_fn_strong(ims):
+    # print("previous_rates ", augmentation.cta.rates['autocontrast'][0])
+    strong = augmentation.strong_batch(ims)
+    weak   = collate_fn_weak(ims)
+    
+    tensors, labels = [torch.tensor(x[0]) for x in strong], [x[1] for x in strong]
+    s = torch.stack(tensors)
+
+    labels, policy = [x[0] for x in labels], labels[0][1]
+
+    return s, weak[0], torch.LongTensor(labels), policy #, augmentation.cta.rates['autocontrast'][0]
 
 
 if __name__ == "__main__":
@@ -79,7 +101,7 @@ if __name__ == "__main__":
     # Creating Data Loaders
 
     augmentation = Augmentation()
-    lbl_loader  = DataLoader(labeled_dataset, batch_size = B, collate_fn = collate_fn_weak)
+    lbl_loader  = DataLoader(labeled_dataset, batch_size = B, collate_fn = collate_fn_strong, num_workers=1)
     ulbl_loader = DataLoader(unlabeled_dataset, batch_size = mu*B, collate_fn = collate_fn_strong, num_workers=3)
 
     #  Model Settings
