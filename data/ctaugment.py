@@ -14,7 +14,8 @@
 """Control Theory based self-augmentation."""
 import random
 from collections import namedtuple
-
+import multiprocessing as mp
+import ctypes
 import numpy as np
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
@@ -45,8 +46,11 @@ class CTAugment:
         self.decay = decay
         self.depth = depth
         self.th = th
-        self.rates = {}
+        self.manager = mp.Manager()
+        self.rates = self.manager.dict()
+        # self.rates = {}
         for k, op in OPS.items():
+            # self.rates[k] = tuple([np.ctypeslib.as_array(mp.Array(ctypes.c_float, [1 for i in range(x)])) for x in op.bins])
             self.rates[k] = tuple([np.ones(x, 'f') for x in op.bins])
 
     def rate_to_p(self, rate):
@@ -80,9 +84,12 @@ class CTAugment:
 
     def update_rates(self, policy, accuracy):
         for k, bins in policy:
+            tmp = []
             for p, rate in zip(bins, self.rates[k]):
                 p = int(p * len(rate) * 0.999)
                 rate[p] = rate[p] * self.decay + accuracy * (1 - self.decay)
+                tmp.append(rate)
+            self.rates[k] = tuple(tmp)
 
     def stats(self):
         return '\n'.join('%-16s    %s' % (k, ' / '.join(' '.join('%.2f' % x for x in self.rate_to_p(rate))

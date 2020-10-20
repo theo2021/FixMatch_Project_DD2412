@@ -12,13 +12,13 @@ import cv2, random, functools
 from collections import defaultdict
 from math import ceil
 import numpy as np
-from ctaugment import CTAugment, apply
+from .ctaugment import CTAugment, apply
 import time
 
 parser = argparse.ArgumentParser(description='Dataset')
 
 parser.add_argument('--download', type=bool, default=True)
-parser.add_argument('--root', type=str, default=os.getcwd()+'databases/')
+parser.add_argument('--root', type=str, default='/home/theo/databases/')
 parser.add_argument('--use_database', type=str, default='CIFAR10')
 parser.add_argument('--task', type=str, default='train')
 parser.add_argument('--batchsize', type=int, default=2)
@@ -163,12 +163,13 @@ class CustomLoader:
 
 
 class DataSet(torch.utils.data.Dataset):
-    def __init__(self, dataset):
+    def __init__(self, dataset, batch=1, steps=None):
         self.database = dataset
+        self.len = batch * (steps if steps is not None else len(dataset))
         
 
     def __getitem__(self, index):
-        #index %= len(self.database)
+        index %= len(self.database)
         image = self.database[index]
     
         im_pil = image[0]
@@ -178,12 +179,31 @@ class DataSet(torch.utils.data.Dataset):
         return X, y
 
     def __len__(self):
-        return len(self.database)
+        return self.len
 
 def visualize(img):
     X = cv2.cvtColor(cv2.resize(img.transpose(1,2,0), (256, 256)), cv2.COLOR_BGR2RGB)
     cv2.imshow('t', X)
     cv2.waitKey()
+
+
+def collate_fn_weak(ims):
+    s = augmentation.weak_batch(ims)
+    tensors, labels = [x[0] for x in s], [x[1] for x in s]
+
+    return torch.stack(tensors), torch.LongTensor(labels)
+
+def collate_fn_strong(ims):
+    # print("previous_rates ", augmentation.cta.rates['autocontrast'][0])
+    strong = augmentation.strong_batch(ims)
+    weak   = collate_fn_weak(ims)
+    
+    tensors, labels = [torch.tensor(x[0]) for x in strong], [x[1] for x in strong]
+    s = torch.stack(tensors)
+
+    labels, policy = [x[0] for x in labels], labels[0][1]
+
+    return s, weak[0], torch.LongTensor(labels), policy#, augmentation.cta.rates['autocontrast'][0]
 
 if __name__ == "__main__":
    
@@ -192,9 +212,11 @@ if __name__ == "__main__":
     dataset_loader = CustomLoader(labels_per_class = labels_per_class, db_dir = args.root, db_name = args.use_database, mode = args.task, download = args.download)
 
     dataset_loader.load()
-
-    unlabeled_dataset = DataSet(dataset_loader.get_set(dataset_loader.unlabeled_set))
-    labeled_dataset   = DataSet(dataset_loader.get_set(dataset_loader.labeled_set))
+    B = 64
+    mu = 7
+    K = 2**20
+    unlabeled_dataset = DataSet(dataset_loader.get_set(dataset_loader.unlabeled_set), batch=B*mu, steps=K)
+    labeled_dataset   = DataSet(dataset_loader.get_set(dataset_loader.labeled_set), batch=B, steps=K)
 
     augmentation = Augmentation()
 
@@ -204,8 +226,8 @@ if __name__ == "__main__":
 
         return torch.stack(tensors), torch.LongTensor(labels)
 
-
     def collate_fn_strong(ims):
+        # print("previous_rates ", augmentation.cta.rates['autocontrast'][0])
         strong = augmentation.strong_batch(ims)
         weak   = collate_fn_weak(ims)
         
@@ -214,18 +236,39 @@ if __name__ == "__main__":
 
         labels, policy = [x[0] for x in labels], labels[0][1]
 
-        return s, weak[0], torch.LongTensor(labels), policy
+        return s, weak[0], torch.LongTensor(labels), policy, augmentation.cta.rates['autocontrast'][0]
 
 
-    lbl_loader  = DataLoader(labeled_dataset, batch_size = 64, collate_fn = collate_fn_weak)
-    ulbl_loader = DataLoader(unlabeled_dataset, batch_size = 7*64, collate_fn = collate_fn_strong, num_workers=3)
-
+    lbl_loader  = DataLoader(labeled_dataset, batch_size = B, collate_fn = collate_fn_weak)
+    ulbl_loader = DataLoader(unlabeled_dataset, batch_size = mu*B, collate_fn = collate_fn_strong, num_workers=2)
+    # augmentation.cta.rates['autocontrast'][0][2] = 3
+    # print(augmentation.cta.rates['autocontrast'])
+    # exit()
     start = time.time()
-    for batch in lbl_loader:
-        weak, labels = batch
-        #strong, weak, labels, policy = batch
+    it=0
+    augmentation.cta.depth = 3
+    print(len(lbl_loader))
+    print(len(ulbl_loader))
+    exit()
+    # ulbl_loader.collate_fn = collate_fn_strong
+    for batch in ulbl_loader:
+        #more = batch
+        strong, weak, labels, policy, prev = batch
+        end = time.time()
+        diff = end-start
+        time.sleep(2)
+        start = time.time()
+        
+        # print(len(policy), augmentation.cta.depth, end-start)
 
-        print(weak.shape)
+        it+=1
+        
+        augmentation.update(policy, -10)
+        print("previous_rates ", prev)
+        print("seting to ", augmentation.cta.rates['autocontrast'][0])
+        print("Time= ", diff)
+        # ulbl_loader.collate_fn = collate_fn_strong
+        # print("augmentation_depth_set_to ", augmentation.cta.depth)
         
     end = time.time()
     print(end-start)
