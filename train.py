@@ -49,10 +49,9 @@ class fixmatch_Loss():
 
 def train_fixmatch(model, trainloader, validation_loader, augmentation, optimizer, scheduler, device, K, tb_writer):
     lossfunc = fixmatch_Loss()
-    run_validation = 100
-    with tqdm(total=K) as bar:
-        itertrain = 0
-        iterval = 0
+    run_validation  = 100
+    with tqdm(total = K) as bar:
+        itertrain, iterval   = 0, 0
         for i, (label_load, ulabel_loader) in enumerate(trainloader):
             #  Unpacking variables
             x_strong, x_weak, x_labels, x_policy = label_load
@@ -61,29 +60,31 @@ def train_fixmatch(model, trainloader, validation_loader, augmentation, optimize
             optimizer.zero_grad()
             labeled_predictions = model(x_weak.to(device))  # weak
             with torch.no_grad():
-                unlabeled_predictions = model(u_weak.to(device))
+                unlabeled_predictions    = model(u_weak.to(device))
             unlabeled_strong_predictions = model(u_strong.to(device))
-            loss = lossfunc(labeled_predictions, x_labels.to(device), unlabeled_predictions, unlabeled_strong_predictions)
+            loss                         = lossfunc(labeled_predictions, x_labels.to(device), unlabeled_predictions, unlabeled_strong_predictions)
             print('train loss:', loss)
             tb_writer.add_scalar('Loss/train', loss, itertrain)
             loss.backward()
             optimizer.step()
             scheduler.step()
+
             # CT augment update
             model.eval()
             with torch.no_grad():
                 pred = model(x_strong.to(device)).softmax(1)
-                mae = F.l1_loss(pred, torch.zeros(pred.size()).to(device).scatter_(1, x_labels.reshape(-1, 1), 1))
+
+                mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device))
                 augmentation.update(x_policy, 1 - 0.5*mae)
             bar.update(1)
 
             # validation
             if i % run_validation == 0:
-                correct, total = 0, 0
+                correct, total  = 0, 0
                 with torch.no_grad(): #Turn off gradients
                     for X, Y in validation_loader:
-                        y = np.argmax(model(X.to(device)).numpy(), axis=1) == Y.numpy()
-                        total += len(y)
+                        y       = np.argmax(model(X.to(device)).cpu().numpy(), axis=1) == Y.numpy()
+                        total  += len(y)
                         correct = np.sum(y)
                         tb_writer.add_scalar('Accuracy/validation', correct/total, iterval)
 
