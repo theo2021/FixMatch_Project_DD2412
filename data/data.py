@@ -36,7 +36,7 @@ class Augmentation:
         self.weak = self.__weak()
 
     def weak_batch(self, x):
-        return [(self.weak(im[0]), im[1]) for im in x]
+        return [(self.weak(im[0])/127.5 -1, im[1]) for im in x]
     
     def strong_batch(self, x):
         policy = self.cta.policy(True)
