@@ -121,7 +121,7 @@ def collate_fn_strong(ims):
 
 def default_collate_fn(ims):
     
-    tensors, labels = [torch.FloatTensor(np.array(x[0]).transpose(2, 0, 1)) for x in ims], [x[1] for x in ims]
+    tensors, labels = [torch.FloatTensor(np.array(x[0]).transpose(2, 0, 1))/255 for x in ims], [x[1] for x in ims]
 
     s = torch.stack(tensors)
 
@@ -161,7 +161,7 @@ if __name__ == "__main__":
 
     model.to(device)
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.003, momentum=0.9)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.003, momentum=0.9, weight_decay=0.0005) # lr should be 0.03
     scheduler = cosineLRreduce(optimizer, K)
 
     train_fixmatch(model,zip(lbl_loader, ulbl_loader), v_loader, augmentation, optimizer, scheduler, device, K, tb_writer)
