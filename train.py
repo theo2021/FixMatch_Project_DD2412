@@ -21,8 +21,8 @@ parser.add_argument('--task', type=str, default='train')
 parser.add_argument('--batchsize', type=int, default=2)
 
 # parsed in main
-parser.add_argument('--B', type = int, default = 20)     # 64
-parser.add_argument('--K', type = int, default = 100)    # 220
+parser.add_argument('--B', type = int, default = 16)     # 64
+parser.add_argument('--K', type = int, default = 1000)    # 220
 parser.add_argument('--mu', type = int, default = 4)     # 7
 
 args = parser.parse_args()
@@ -40,8 +40,8 @@ class fixmatch_Loss():
         max_pred, pseudolabels = unlabeled_weak_predictions.softmax(1).max(axis=1)
         indexes_over_threshold = max_pred > self.tau
         if indexes_over_threshold.sum() > 0:
-            over, total = indexes_over_threshold.size()[0], indexes_over_threshold.sum()
-            unsupervised = over / total * F.cross_entropy(unlabeled_strong_predictions[indexes_over_threshold], pseudolabels[indexes_over_threshold])
+            total, over = indexes_over_threshold.size()[0], indexes_over_threshold.sum()
+            unsupervised = (over / total) * F.cross_entropy(unlabeled_strong_predictions[indexes_over_threshold], pseudolabels[indexes_over_threshold])
         else:
             return supervised
         return supervised + self.u_weight * unsupervised
@@ -73,13 +73,12 @@ def train_fixmatch(model, trainloader, validation_loader, augmentation, optimize
             model.eval()
             with torch.no_grad():
                 pred = model(x_strong.to(device)).softmax(1)
-
                 mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device))
                 augmentation.update(x_policy, 1 - 0.5*mae)
             bar.update(1)
 
             # validation
-            if i % run_validation == 0:
+            if i > 0 and i % run_validation == 0:
                 correct, total  = 0, 0
                 with torch.no_grad(): #Turn off gradients
                     for X, Y in validation_loader:
@@ -137,7 +136,7 @@ if __name__ == "__main__":
 
     
     # Creating Dataset
-    labels_per_class  = [10 for _ in range(10)]
+    labels_per_class  = [100 for _ in range(10)]
     dataset_loader    = CustomLoader(labels_per_class = labels_per_class, db_dir = args.root, db_name = args.use_database, mode = args.task, download = args.download)
     dataset_loader.load()
 
@@ -148,15 +147,15 @@ if __name__ == "__main__":
     # Creating Data Loaders
 
     augmentation  = Augmentation()
-    v_loader    = DataLoader(validation_dataset, batch_size = (mu + 1)*B, collate_fn = default_collate_fn, num_workers=1, pin_memory = False)
-    lbl_loader    = DataLoader(labeled_dataset, batch_size = B, collate_fn = collate_fn_strong, num_workers = 1, pin_memory = False)
-    ulbl_loader   = DataLoader(unlabeled_dataset, batch_size = mu*B, collate_fn = collate_fn_strong, num_workers = 3, pin_memory = False)
+    v_loader    = DataLoader(validation_dataset, batch_size = (mu + 1)*B, collate_fn = default_collate_fn, num_workers=1, pin_memory = False, shuffle=True)
+    lbl_loader    = DataLoader(labeled_dataset, batch_size = B, collate_fn = collate_fn_strong, num_workers = 1, pin_memory = False, shuffle=True)
+    ulbl_loader   = DataLoader(unlabeled_dataset, batch_size = mu*B, collate_fn = collate_fn_strong, num_workers = 3, pin_memory = False, shuffle=True)
 
     #  Model Settings
 
     model.to(device)
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.03, momentum=0.9)
     scheduler = cosineLRreduce(optimizer, K)
 
     train_fixmatch(model,zip(lbl_loader, ulbl_loader), v_loader, augmentation, optimizer, scheduler, device, K, tb_writer)
