@@ -38,7 +38,7 @@ def apply(x, ops):
     y = Image.fromarray(np.round(127.5 * (1 + x)).clip(0, 255).astype('uint8'))
     for op, args in ops:
         y = OPS[op].f(y, *args)
-    return (np.asarray(y).astype('f') / 127.5 - 1).transpose(2, 0, 1)
+    return (np.asarray(y).astype('f') / 255).transpose(2, 0, 1)
 
 
 class CTAugment:
