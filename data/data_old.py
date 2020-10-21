@@ -126,7 +126,7 @@ class DataSet(torch.utils.data.Dataset):
         self.unlabeled_set = set([x for x in range(len(self))]) - self.labeled_set 
 
     def __getitem__(self, index):
-
+        
         image = self.database[index]
     
         im_pil = image[0]

@@ -22,11 +22,12 @@ parser.add_argument('--batchsize', type=int, default=2)
 
 # parsed in main
 parser.add_argument('--B', type = int, default = 16)     # 64
-parser.add_argument('--K', type = int, default = 1000)    # 220
+parser.add_argument('--K', type = int, default = 10000)    # 220
 parser.add_argument('--mu', type = int, default = 4)     # 7
 
 args = parser.parse_args()
 
+augmentation  = Augmentation()
 
 class fixmatch_Loss():
 
@@ -75,17 +76,19 @@ def train_fixmatch(model, trainloader, validation_loader, augmentation, optimize
                 pred = model(x_strong.to(device)).softmax(1)
                 mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device))
                 augmentation.update(x_policy, 1 - 0.5*mae)
+                print('aug updates:', augmentation.cta.updates)
             bar.update(1)
 
             # validation
             if i > 0 and i % run_validation == 0:
                 correct, total  = 0, 0
+                model.eval()
                 with torch.no_grad(): #Turn off gradients
                     for X, Y in validation_loader:
                         y       = np.argmax(model(X.to(device)).cpu().numpy(), axis=1) == Y.numpy()
                         total  += len(y)
-                        correct = np.sum(y)
-                        tb_writer.add_scalar('Accuracy/validation', correct/total, iterval)
+                        correct += np.sum(y)
+                    tb_writer.add_scalar('Accuracy/validation', correct/total, iterval)
 
                     print('Validation on iteration k={0} yielded {1} accuracy'.format(i, correct/total))
 
@@ -95,12 +98,14 @@ def train_fixmatch(model, trainloader, validation_loader, augmentation, optimize
                 
 
 def collate_fn_weak(ims):
+    global augmentation
     s = augmentation.weak_batch(ims)
     tensors, labels = [x[0] for x in s], [x[1] for x in s]
 
     return torch.stack(tensors), torch.LongTensor(labels)
 
 def collate_fn_strong(ims):
+    global augmentation
     # print("previous_rates ", augmentation.cta.rates['autocontrast'][0])
     strong = augmentation.strong_batch(ims)
     weak   = collate_fn_weak(ims)
@@ -109,6 +114,7 @@ def collate_fn_strong(ims):
     s = torch.stack(tensors)
 
     labels, policy = [x[0] for x in labels], labels[0][1]
+    print('updates:', augmentation.cta.updates)
 
     return s, weak[0], torch.LongTensor(labels), policy #, augmentation.cta.rates['autocontrast'][0]
 
@@ -142,20 +148,20 @@ if __name__ == "__main__":
 
     unlabeled_dataset                        = DataSet(dataset_loader.get_set(dataset_loader.unlabeled_set), batch=B*mu, steps=K)
     labeled_dataset                          = DataSet(dataset_loader.get_set(dataset_loader.labeled_set), batch=B, steps=K)
-    unlabeled_dataset, validation_dataset    = unlabeled_dataset.split(p=0.9)
+    unlabeled_dataset, validation_dataset    = unlabeled_dataset.split(p=0.9, seed=43)
 
     # Creating Data Loaders
 
-    augmentation  = Augmentation()
-    v_loader    = DataLoader(validation_dataset, batch_size = (mu + 1)*B, collate_fn = default_collate_fn, num_workers=1, pin_memory = False, shuffle=True)
-    lbl_loader    = DataLoader(labeled_dataset, batch_size = B, collate_fn = collate_fn_strong, num_workers = 1, pin_memory = False, shuffle=True)
-    ulbl_loader   = DataLoader(unlabeled_dataset, batch_size = mu*B, collate_fn = collate_fn_strong, num_workers = 3, pin_memory = False, shuffle=True)
+    
+    v_loader    = DataLoader(validation_dataset, batch_size = (mu + 1)*B, collate_fn = default_collate_fn, num_workers=1, pin_memory = True, shuffle=True)
+    lbl_loader    = DataLoader(labeled_dataset, batch_size = B, collate_fn = collate_fn_strong, pin_memory = True, shuffle=True)
+    ulbl_loader   = DataLoader(unlabeled_dataset, batch_size = mu*B, collate_fn = collate_fn_strong, pin_memory = True, shuffle=True)
 
     #  Model Settings
 
     model.to(device)
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.03, momentum=0.9)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.003, momentum=0.9)
     scheduler = cosineLRreduce(optimizer, K)
 
     train_fixmatch(model,zip(lbl_loader, ulbl_loader), v_loader, augmentation, optimizer, scheduler, device, K, tb_writer)

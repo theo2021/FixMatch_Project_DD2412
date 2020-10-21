@@ -48,6 +48,7 @@ class CTAugment:
         self.th = th
         self.manager = mp.Manager()
         self.rates = self.manager.dict()
+        self.updates = 0
         # self.rates = {}
         for k, op in OPS.items():
             # self.rates[k] = tuple([np.ctypeslib.as_array(mp.Array(ctypes.c_float, [1 for i in range(x)])) for x in op.bins])
@@ -83,6 +84,7 @@ class CTAugment:
         return v
 
     def update_rates(self, policy, accuracy):
+        self.updates +=1
         for k, bins in policy:
             tmp = []
             for p, rate in zip(bins, self.rates[k]):
