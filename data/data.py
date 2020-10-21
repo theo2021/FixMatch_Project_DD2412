@@ -14,11 +14,12 @@ from math import ceil
 import numpy as np
 from .ctaugment import CTAugment, apply
 import time
+from torch.utils.tensorboard import SummaryWriter
 
 parser = argparse.ArgumentParser(description='Dataset')
 
 parser.add_argument('--download', type=bool, default=True)
-parser.add_argument('--root', type=str, default='/home/databases')
+parser.add_argument('--root', type=str, default='/home/firedragon/databases')
 parser.add_argument('--use_database', type=str, default='CIFAR10')
 parser.add_argument('--task', type=str, default='train')
 parser.add_argument('--batchsize', type=int, default=2)
@@ -120,7 +121,6 @@ class CustomLoader:
     def get_set(self, idxs):
         '''
         idxs a collection of indexes into self
-
         returns a collection of images
         '''
         return [self[i] for i in idxs]
@@ -137,16 +137,16 @@ class CustomLoader:
         assert len(label_set) == functools.reduce(lambda a, b : a + b, self.labels_per_class)
         
         self.labeled_set    = label_set
-        self.unlabeled_set = set([x for x in range(len(self))]) - self.labeled_set 
+        self.unlabeled_set  = set([x for x in range(len(self))]) - self.labeled_set 
 
     def __getitem__(self, index):
 
-        image = self.database[index]
+        image    = self.database[index]
     
-        im_pil = image[0]
+        im_pil   = image[0]
         im_label = image[1]
 
-        X, y = im_pil, im_label
+        X, y     = im_pil, im_label
         return X, y
 
     def __len__(self):
@@ -154,7 +154,7 @@ class CustomLoader:
 
     def visualize(self, index):
         X, y, has_label = self[index]
-        X = cv2.cvtColor(cv2.resize(X.numpy().transpose(1,2,0), (256, 256)), cv2.COLOR_BGR2RGB)
+        X               = cv2.cvtColor(cv2.resize(X.numpy().transpose(1,2,0), (256, 256)), cv2.COLOR_BGR2RGB)
         cv2.imshow('t', X)
         cv2.waitKey()
         #Image.fromarray(X).show()
@@ -165,25 +165,24 @@ class CustomLoader:
 class DataSet(torch.utils.data.Dataset):
     def __init__(self, dataset, batch=1, steps=None):
         self.database = dataset
-        self.steps = steps
-        self.batch = batch
-        self.len = batch * (steps if steps is not None else len(dataset))
+        self.steps    = steps
+        self.batch    = batch
+        self.len      = batch * (steps if steps is not None else len(dataset))
         
 
     def __getitem__(self, index):
-        index %= len(self.database)
-        image = self.database[index]
+        index   %= len(self.database)
+        image    = self.database[index]
     
-        im_pil = image[0]
+        im_pil   = image[0]
         im_label = image[1]
 
-        X, y = im_pil, im_label
+        X, y     = im_pil, im_label
         return X, y
 
     def split(self, p, seed = 42):
         '''
         Split into two datasets given proportion p
-
         return length p * len(self) and (1-p) * len(self) DISJOINT datasets
         '''
         np.random.seed(seed)
@@ -192,8 +191,7 @@ class DataSet(torch.utils.data.Dataset):
         left_ds  = set(random.sample(sample_space, int(p*len(self.database))))
         right_ds = set(sample_space) - left_ds
 
-
-        return DataSet([self.database[i] for i in left_ds], batch = self.batch, steps = self.steps), DataSet([self.database[i] for i in right_ds])
+        return DataSet([self.database[i] for i in left_ds], batch = self.batch, steps = self.steps), DataSet([self.database[i] for i in right_ds], batch = 1, steps = None)
 
 
     def __len__(self):
@@ -299,7 +297,6 @@ if __name__ == "__main__":
         Y = augmentation.weak_batch(b)
     end = time.time()
     print((((end - start)/loader.K) *2**20)/(60*60), 'h' )
-
     #print(X)
     '''
 
