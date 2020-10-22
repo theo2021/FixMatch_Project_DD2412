@@ -51,7 +51,7 @@ class fixmatch_Loss():
 
 def train_fixmatch(model, trainloader, validation_loader, augmentation, optimizer, scheduler, device, K, tb_writer):
     # if model is confident for this threshold start the unlabeled and ctaugment
-    confidence_threshold = 200
+    confidence_threshold = 35
     confidence_sum = 0
     lossfunc = fixmatch_Loss()
     run_validation  = 200
@@ -177,7 +177,7 @@ if __name__ == "__main__":
 
     model.to(device)
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.03, momentum=0.9, weight_decay=0.0005) # lr should be 0.03
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.003, momentum=0.9, weight_decay=0.0005, nesterov=True) # lr should be 0.03
     scheduler = cosineLRreduce(optimizer, K)
 
     train_fixmatch(model,zip(lbl_loader, ulbl_loader), v_loader, augmentation, optimizer, scheduler, device, K, tb_writer)
