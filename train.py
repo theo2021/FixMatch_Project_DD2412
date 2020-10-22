@@ -77,11 +77,11 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
                 #    unlabeled_predictions    = model(u_weak.to(device))
                 #unlabeled_strong_predictions = model(u_strong.to(device))
                 
-                u_weak = u_weak.to(device)
+                u_weak                               = u_weak.to(device)
                 u_weak.requires_grad                 = False
                 #print(u_weak.requires_grad)
                 u_strong                             = u_strong.to(device)
-                u_unified                            = torch.cat((u_weak, u_strong), dim=0)
+                u_unified                            = torch.cat((u_weak, u_strong), dim = 0)
                 #print(u_unified.shape)
                 predictions_unlbl_unified                           = model(u_unified)
                 unlabeled_predictions, unlabeled_strong_predictions = torch.split(predictions_unlbl_unified, split_size_or_sections=args.mu*args.B, dim=0)
