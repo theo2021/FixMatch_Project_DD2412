@@ -13,6 +13,7 @@ import numpy as np
 
 parser = argparse.ArgumentParser(description='Dataset')
 parser.add_argument('--download', type=bool, default=True)
+parser.add_argument('--tbsw_logdir', type=str, default=None)
 parser.add_argument('--root', type=str, default='~/databases/')              #sudo mkdir /home/databases and then sudo chmod -R 777 /home/databases (for permissions) 
 parser.add_argument('--save_dir', type=str, default='~/DeepLearningModels/')
 parser.add_argument('--name_model_specs', type=str, default='FixMatchModel')
@@ -23,7 +24,7 @@ parser.add_argument('--batchsize', type=int, default=2)
 # parsed in main
 parser.add_argument('--B', type = int, default = 16)     # 64
 parser.add_argument('--K', type = int, default = 10000)    # 220
-parser.add_argument('--mu', type = int, default = 4)     # 7
+parser.add_argument('--mu', type = int, default = 7)     # 7
 
 args = parser.parse_args()
 
@@ -65,7 +66,7 @@ def train_fixmatch(model, trainloader, validation_loader, augmentation, optimize
             if confidence_sum < confidence_threshold:
                 # no need to train the whole network at start since network isn't even confident for the training predictions
                 confidence_sum += (labeled_predictions.softmax(1).max(axis=1)[0] > 0.95).sum()
-                loss = F.cross_entropy(labeled_predictions, x_labels)
+                loss = F.cross_entropy(labeled_predictions.to(device), x_labels.to(device))
             else:
                 u_strong, u_weak, u_labels, u_policy = ulabel_loader          
                 with torch.no_grad():
@@ -146,7 +147,7 @@ if __name__ == "__main__":
     import torch
     
     # tensorboard writer
-    tb_writer = SummaryWriter()
+    tb_writer = SummaryWriter(log_dir=args.tbsw_logdir)
     device    = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     K         = args.K                         # steps: 2**20 ideal
     B         = args.B                         # batch size: 64 ideal

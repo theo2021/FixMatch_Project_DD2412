@@ -16,6 +16,7 @@ from .ctaugment import CTAugment, apply
 import time
 from torch.utils.tensorboard import SummaryWriter
 
+'''
 parser = argparse.ArgumentParser(description='Dataset')
 
 parser.add_argument('--download', type=bool, default=True)
@@ -25,7 +26,7 @@ parser.add_argument('--task', type=str, default='train')
 parser.add_argument('--batchsize', type=int, default=2)
 
 args = parser.parse_args()
-
+'''
 
 #https://www.cs.toronto.edu/~kriz/cifar.html
 #http://ufldl.stanford.edu/housenumbers/
@@ -221,6 +222,7 @@ def collate_fn_strong(ims):
 
     return s, weak[0], torch.LongTensor(labels), policy#, augmentation.cta.rates['autocontrast'][0]
 
+'''
 if __name__ == "__main__":
    
     labels_per_class  = [10 for _ in range(10)]
@@ -288,7 +290,8 @@ if __name__ == "__main__":
         
     end = time.time()
     print(end-start)
-    '''
+'''
+'''
     #TIME TEST
     start = time.time()
     for (ub, b, lbl) in loader:
@@ -298,7 +301,8 @@ if __name__ == "__main__":
     end = time.time()
     print((((end - start)/loader.K) *2**20)/(60*60), 'h' )
     #print(X)
-    '''
+'''
+'''
 
 
     
@@ -310,3 +314,4 @@ if __name__ == "__main__":
 
 
     #print(augmented_dataset.__getitem__(0))
+'''
