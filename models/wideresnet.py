@@ -62,6 +62,17 @@ class WideResNet(nn.Module):
         self.layers.append(nn.AvgPool2d(kernel_size=8))
 
         self.fc = nn.Linear(self.dimensions_of_next_convs[-1], classes)
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight,
+                                        mode='fan_out',
+                                        nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1.0)
+                nn.init.constant_(m.bias, 0.0)
+            elif isinstance(m, nn.Linear):
+                nn.init.xavier_normal_(m.weight)
+                nn.init.constant_(m.bias, 0.0)
 
     def forward(self, x):
         _ = self.layers[0](x)

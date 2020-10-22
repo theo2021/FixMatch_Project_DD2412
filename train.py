@@ -13,8 +13,8 @@ import numpy as np
 
 parser = argparse.ArgumentParser(description='Dataset')
 parser.add_argument('--download', type=bool, default=True)
-parser.add_argument('--root', type=str, default='/home/databases/')              #sudo mkdir /home/databases and then sudo chmod -R 777 /home/databases (for permissions) 
-parser.add_argument('--save_dir', type=str, default='/home/DeepLearningModels/')
+parser.add_argument('--root', type=str, default='~/databases/')              #sudo mkdir /home/databases and then sudo chmod -R 777 /home/databases (for permissions) 
+parser.add_argument('--save_dir', type=str, default='~/DeepLearningModels/')
 parser.add_argument('--name_model_specs', type=str, default='FixMatchModel')
 parser.add_argument('--use_database', type=str, default='CIFAR10')
 parser.add_argument('--task', type=str, default='train')
@@ -49,34 +49,46 @@ class fixmatch_Loss():
 
 
 def train_fixmatch(model, trainloader, validation_loader, augmentation, optimizer, scheduler, device, K, tb_writer):
+    # if model is confident for this threshold start the unlabeled and ctaugment
+    confidence_threshold = 200
+    confidence_sum = 0
     lossfunc = fixmatch_Loss()
-    run_validation  = 100
+    run_validation  = 200
     with tqdm(total = K) as bar:
         itertrain, iterval   = 0, 0
         for i, (label_load, ulabel_loader) in enumerate(trainloader):
             #  Unpacking variables
             x_strong, x_weak, x_labels, x_policy = label_load
-            u_strong, u_weak, u_labels, u_policy = ulabel_loader
             model.train()
             optimizer.zero_grad()
             labeled_predictions = model(x_weak.to(device))  # weak
-            with torch.no_grad():
-                unlabeled_predictions    = model(u_weak.to(device))
-            unlabeled_strong_predictions = model(u_strong.to(device))
-            loss                         = lossfunc(labeled_predictions, x_labels.to(device), unlabeled_predictions, unlabeled_strong_predictions)
+            if confidence_sum < confidence_threshold:
+                # no need to train the whole network at start since network isn't even confident for the training predictions
+                confidence_sum += (labeled_predictions.softmax(1).max(axis=1)[0] > 0.95).sum()
+                loss = F.cross_entropy(labeled_predictions, x_labels)
+            else:
+                u_strong, u_weak, u_labels, u_policy = ulabel_loader          
+                with torch.no_grad():
+                    unlabeled_predictions    = model(u_weak.to(device))
+                unlabeled_strong_predictions = model(u_strong.to(device))
+                loss = lossfunc(labeled_predictions, x_labels.to(device), unlabeled_predictions, unlabeled_strong_predictions)
             print('train loss:', loss)
+            print('over_confidence', confidence_sum, 'lr', optimizer.param_groups[0]['lr'])
+
             tb_writer.add_scalar('Loss/train', loss, itertrain)
             loss.backward()
             optimizer.step()
             scheduler.step()
 
             # CT augment update
-            model.eval()
-            with torch.no_grad():
-                pred = model(x_strong.to(device)).softmax(1)
-                mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device))
-                augmentation.update(x_policy, 1 - 0.5*mae)
-                print('aug updates:', augmentation.cta.updates)
+            if confidence_sum > confidence_threshold:
+                #network not mature for CTaugment
+                model.eval()
+                with torch.no_grad():
+                    pred = model(x_strong.to(device)).softmax(1)
+                    mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device))
+                    augmentation.update(x_policy, 1 - 0.5*mae)
+                    print('aug updates:', augmentation.cta.updates)
             bar.update(1)
 
             # validation
@@ -130,6 +142,7 @@ def default_collate_fn(ims):
 
 if __name__ == "__main__":
     from models.wideresnet import WideResNet
+    # from models.WideResNet import WideResNet
     import torch
     
     # tensorboard writer
@@ -137,7 +150,9 @@ if __name__ == "__main__":
     device    = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     K         = args.K                         # steps: 2**20 ideal
     B         = args.B                         # batch size: 64 ideal
-    mu        = args.mu                        # prop unsup/sup: 7 ideal
+    mu        = args.mu    
+    strides = [1, 1, 2, 2]
+    # model = WideResNet(d=28, k=3, n_classes=10, input_features=3, output_features=16, strides=strides)                # prop unsup/sup: 7 ideal
     model     = WideResNet(3, 28, 2, 10)
 
     
@@ -161,7 +176,7 @@ if __name__ == "__main__":
 
     model.to(device)
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.003, momentum=0.9, weight_decay=0.0005) # lr should be 0.03
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.03, momentum=0.9, weight_decay=0.0005) # lr should be 0.03
     scheduler = cosineLRreduce(optimizer, K)
 
     train_fixmatch(model,zip(lbl_loader, ulbl_loader), v_loader, augmentation, optimizer, scheduler, device, K, tb_writer)

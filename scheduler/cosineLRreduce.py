@@ -12,7 +12,7 @@ class cosineLRreduce(_LRScheduler):
         super(cosineLRreduce, self).__init__(optimizer)
 
     def get_lr(self):
-        c_step = self._step_count -2
+        c_step = max(1, self._step_count)
         if c_step > self.K:
             print("scheduler error, k > K")
             return [base_lr/(2**10) for base_lr in self.base_lrs] # if error return very small learning rate
