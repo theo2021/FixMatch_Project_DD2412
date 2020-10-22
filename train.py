@@ -54,10 +54,10 @@ class fixmatch_Loss():
 
 def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, optimizer, scheduler, device, K, tb_writer):
     # if model is confident for this threshold start the unlabeled and ctaugment
-    confidence_threshold = 35
-    confidence_sum = 0
-    lossfunc = fixmatch_Loss()
-    run_validation  = 200
+    confidence_threshold     = 35
+    confidence_sum           = 0
+    lossfunc                 = fixmatch_Loss()
+    run_validation           = 200
     with tqdm(total = K) as bar:
         itertrain, iterval   = 0, 0
         for i, (label_load, ulabel_loader) in enumerate(trainloader):
@@ -65,11 +65,11 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             x_strong, x_weak, x_labels, x_policy = label_load
             model.train()
             optimizer.zero_grad()
-            labeled_predictions = model(x_weak.to(device))  # weak
+            labeled_predictions                  = model(x_weak.to(device))  # weak
             if confidence_sum < confidence_threshold:
                 # no need to train the whole network at start since network isn't even confident for the training predictions
                 confidence_sum += (labeled_predictions.softmax(1).max(axis=1)[0] > 0.95).sum()
-                loss = F.cross_entropy(labeled_predictions.to(device), x_labels.to(device))
+                loss            = F.cross_entropy(labeled_predictions.to(device), x_labels.to(device))
             else:
                 u_strong, u_weak, u_labels, u_policy = ulabel_loader          
                 
@@ -87,7 +87,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
                 unlabeled_predictions, unlabeled_strong_predictions = torch.split(predictions_unlbl_unified, split_size_or_sections=args.mu*args.B, dim=0)
                 #print(unlabeled_predictions.shape)
                 loss                                                = lossfunc(labeled_predictions, x_labels.to(device), unlabeled_predictions, unlabeled_strong_predictions)
-            
+                
             print('train loss:', loss)
             print('over_confidence', confidence_sum, 'lr', optimizer.param_groups[0]['lr'])
             
