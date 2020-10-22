@@ -1,6 +1,6 @@
 # import torch
 from torch import nn
-from torchsummary import summary
+#from torchsummary import summary
 
 
 class Pipe(nn.Module):
@@ -81,8 +81,9 @@ class WideResNet(nn.Module):
         _ = _.view(-1, self.dimensions_of_next_convs[-1])
         return self.fc(_)
 
-
+'''
 if __name__ == '__main__':
     wrn = WideResNet(3, 28, 2, 10)
     print("Just testing the model")
     summary(wrn, (3, 32, 32))
+'''
