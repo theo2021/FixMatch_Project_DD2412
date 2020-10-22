@@ -78,19 +78,19 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
                 #unlabeled_strong_predictions = model(u_strong.to(device))
                 
                 u_weak = u_weak.to(device)
-                u_weak.requires_grad = False
+                u_weak.requires_grad                 = False
                 #print(u_weak.requires_grad)
-                u_strong = u_strong.to(device)
-                u_unified = torch.cat((u_weak, u_strong), dim=0)
+                u_strong                             = u_strong.to(device)
+                u_unified                            = torch.cat((u_weak, u_strong), dim=0)
                 #print(u_unified.shape)
-                predictions_unlbl_unified  = model(u_unified)
+                predictions_unlbl_unified                           = model(u_unified)
                 unlabeled_predictions, unlabeled_strong_predictions = torch.split(predictions_unlbl_unified, split_size_or_sections=args.mu*args.B, dim=0)
                 #print(unlabeled_predictions.shape)
-                
-                loss = lossfunc(labeled_predictions, x_labels.to(device), unlabeled_predictions, unlabeled_strong_predictions)
+                loss                                                = lossfunc(labeled_predictions, x_labels.to(device), unlabeled_predictions, unlabeled_strong_predictions)
+            
             print('train loss:', loss)
             print('over_confidence', confidence_sum, 'lr', optimizer.param_groups[0]['lr'])
-
+            
             tb_writer.add_scalar('Loss/train', loss, itertrain)
             loss.backward()
             optimizer.step()
