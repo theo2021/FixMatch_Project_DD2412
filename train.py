@@ -25,7 +25,7 @@ parser.add_argument('--batchsize', type=int, default=2)
 
 # parsed in main
 parser.add_argument('--B', type = int, default = 16)     # 64
-parser.add_argument('--K', type = int, default = 1)    # 220
+parser.add_argument('--K', type = int, default = 1000)    # 220
 parser.add_argument('--mu', type = int, default = 7)     # 7
 
 args = parser.parse_args()
