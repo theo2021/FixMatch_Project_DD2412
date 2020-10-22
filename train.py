@@ -9,8 +9,10 @@ from torch.nn import functional as F
 from data.data import DataSet, Augmentation, CustomLoader
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from models.EMA import EMA
+import datetime
 import numpy as np
-
+import os
 parser = argparse.ArgumentParser(description='Dataset')
 parser.add_argument('--download', type=bool, default=True)
 parser.add_argument('--tbsw_logdir', type=str, default=None)
@@ -23,12 +25,13 @@ parser.add_argument('--batchsize', type=int, default=2)
 
 # parsed in main
 parser.add_argument('--B', type = int, default = 16)     # 64
-parser.add_argument('--K', type = int, default = 10000)    # 220
+parser.add_argument('--K', type = int, default = 1)    # 220
 parser.add_argument('--mu', type = int, default = 7)     # 7
 
 args = parser.parse_args()
 
 augmentation  = Augmentation()
+
 
 class fixmatch_Loss():
 
@@ -49,7 +52,7 @@ class fixmatch_Loss():
         return supervised + self.u_weight * unsupervised
 
 
-def train_fixmatch(model, trainloader, validation_loader, augmentation, optimizer, scheduler, device, K, tb_writer):
+def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, optimizer, scheduler, device, K, tb_writer):
     # if model is confident for this threshold start the unlabeled and ctaugment
     confidence_threshold = 35
     confidence_sum = 0
@@ -80,6 +83,7 @@ def train_fixmatch(model, trainloader, validation_loader, augmentation, optimize
             loss.backward()
             optimizer.step()
             scheduler.step()
+            ema.update()
 
             # CT augment update
             if confidence_sum > confidence_threshold:
@@ -89,7 +93,6 @@ def train_fixmatch(model, trainloader, validation_loader, augmentation, optimize
                     pred = model(x_strong.to(device)).softmax(1)
                     mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device))
                     augmentation.update(x_policy, 1 - 0.5*mae)
-                    print('aug updates:', augmentation.cta.updates)
             bar.update(1)
 
             # validation
@@ -127,7 +130,6 @@ def collate_fn_strong(ims):
     s = torch.stack(tensors)
 
     labels, policy = [x[0] for x in labels], labels[0][1]
-    print('updates:', augmentation.cta.updates)
 
     return s, weak[0], torch.LongTensor(labels), policy #, augmentation.cta.rates['autocontrast'][0]
 
@@ -170,22 +172,29 @@ if __name__ == "__main__":
 
     
     v_loader    = DataLoader(validation_dataset, batch_size = (mu + 1)*B, collate_fn = default_collate_fn, num_workers=1, pin_memory = True, shuffle=True)
-    lbl_loader    = DataLoader(labeled_dataset, batch_size = B, collate_fn = collate_fn_strong, pin_memory = True, shuffle=True)
-    ulbl_loader   = DataLoader(unlabeled_dataset, batch_size = mu*B, collate_fn = collate_fn_strong, pin_memory = True, shuffle=True)
+    lbl_loader    = DataLoader(labeled_dataset, batch_size = B, collate_fn = collate_fn_strong, num_workers = 1, pin_memory = True, shuffle=True)
+    ulbl_loader   = DataLoader(unlabeled_dataset, batch_size = mu*B, collate_fn = collate_fn_strong, num_workers = 3, pin_memory = True, shuffle=True)
 
     #  Model Settings
 
     model.to(device)
+    ema = EMA(model, decay = 0.999)
+    ema.register()
 
     optimizer = torch.optim.SGD(model.parameters(), lr=0.003, momentum=0.9, weight_decay=0.0005, nesterov=True) # lr should be 0.03
     scheduler = cosineLRreduce(optimizer, K)
 
-    train_fixmatch(model,zip(lbl_loader, ulbl_loader), v_loader, augmentation, optimizer, scheduler, device, K, tb_writer)
+    train_fixmatch(model,ema, zip(lbl_loader, ulbl_loader), v_loader, augmentation, optimizer, scheduler, device, K, tb_writer)
     tb_writer.close()
 
-    torch.save(model.state_dict(), args.save_dir + args.name_model_specs + '_' + args.use_database) # save trained weights and model arguments
 
+    # Save everything
 
+    save_dir, prefix = os.path.expanduser(args.save_dir), str(datetime.datetime.now())
+    
+    torch.save(model.state_dict(), os.path.join(save_dir, prefix + args.name_model_specs + "_" + args.use_database + '.state_dict'))
+    ema.apply_shadow()
+    torch.save(model.state_dict(), os.path.join(save_dir, prefix + args.name_model_specs + "_" + args.use_database + '_EMA' '.state_dict'))
 
     
     
