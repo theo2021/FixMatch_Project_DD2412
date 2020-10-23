@@ -40,7 +40,7 @@ def apply(x, ops):
         y = OPS[op].f(y, *args)
     lvl = random.uniform(0, 0.5)
     y = cutout(y, lvl)
-    return np.asarray(y).astype('f') / 255
+    return (np.asarray(y).astype('f') / 255).transpose(2,0,1)
 
 class CTAugment:
     def __init__(self, depth=2, th=0.85, decay=0.99):
