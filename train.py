@@ -86,7 +86,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
                 
                 with torch.no_grad():
                     unlabeled_predictions    = model(u_weak.to(device))
-                unlabeled_strong_predictions = model(cutout(u_strong).to(device))
+                unlabeled_strong_predictions = model(cutout(u_strong, level = 1).to(device))
                 
                 
                 '''
