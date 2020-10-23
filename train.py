@@ -13,6 +13,7 @@ from models.EMA import EMA
 import datetime
 import numpy as np
 import os
+
 parser = argparse.ArgumentParser(description='Dataset')
 parser.add_argument('--download', type=bool, default=True)
 parser.add_argument('--tbsw_logdir', type=str, default=None)
@@ -28,6 +29,12 @@ parser.add_argument('--B', type = int, default = 16)     # 64
 parser.add_argument('--K', type = int, default = 1000)    # 220
 parser.add_argument('--mu', type = int, default = 7)     # 7
 
+# To Do
+parser.add_argument('--UKF_noise_regularizer', type=bool, default=False)
+parser.add_argument('--ensemble_model', type=bool, default=False)
+
+
+
 args = parser.parse_args()
 
 augmentation  = Augmentation()
@@ -36,17 +43,17 @@ augmentation  = Augmentation()
 class fixmatch_Loss():
 
     def __init__(self, l=1, threshold=0.95):
-        self.u_weight = l
-        self.tau = threshold
+        self.u_weight          = l
+        self.tau               = threshold
 
     def __call__(self, labeled_prediction, labeled_labels,
                  unlabeled_weak_predictions, unlabeled_strong_predictions):
-        supervised = F.cross_entropy(labeled_prediction, labeled_labels)
+        supervised             = F.cross_entropy(labeled_prediction, labeled_labels)
         max_pred, pseudolabels = unlabeled_weak_predictions.softmax(1).max(axis=1)
         indexes_over_threshold = max_pred > self.tau
         if indexes_over_threshold.sum() > 0:
-            total, over = indexes_over_threshold.size()[0], indexes_over_threshold.sum()
-            unsupervised = (over / total) * F.cross_entropy(unlabeled_strong_predictions[indexes_over_threshold], pseudolabels[indexes_over_threshold])
+            total, over        = indexes_over_threshold.size()[0], indexes_over_threshold.sum()
+            unsupervised       = (over / total) * F.cross_entropy(unlabeled_strong_predictions[indexes_over_threshold], pseudolabels[indexes_over_threshold])
         else:
             return supervised
         return supervised + self.u_weight * unsupervised
@@ -73,10 +80,10 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             else:
                 u_strong, u_weak, u_labels, u_policy = ulabel_loader          
                 
-                #with torch.no_grad():
-                #    unlabeled_predictions    = model(u_weak.to(device))
-                #unlabeled_strong_predictions = model(u_strong.to(device))
-                
+                with torch.no_grad():
+                    unlabeled_predictions    = model(u_weak.to(device))
+                unlabeled_strong_predictions = model(u_strong.to(device))
+                '''
                 u_weak                               = u_weak.to(device)
                 u_weak.requires_grad                 = False
                 #print(u_weak.requires_grad)
@@ -86,6 +93,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
                 predictions_unlbl_unified                           = model(u_unified)
                 unlabeled_predictions, unlabeled_strong_predictions = torch.split(predictions_unlbl_unified, split_size_or_sections=args.mu*args.B, dim=0)
                 #print(unlabeled_predictions.shape)
+                '''
                 loss                                                = lossfunc(labeled_predictions, x_labels.to(device), unlabeled_predictions, unlabeled_strong_predictions)
                 
             print('train loss:', loss)
