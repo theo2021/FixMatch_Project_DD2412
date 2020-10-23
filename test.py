@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser(description='Testing script')
 parser.add_argument('--download', type=bool, default=True)
 parser.add_argument('--root', type=str, default='~/databases/')              #sudo mkdir /home/databases and then sudo chmod -R 777 /home/databases (for permissions) 
 parser.add_argument('--save_dir', type=str, default='~/DeepLearningModels/')
-parser.add_argument('--name_model_specs', type=str, default='2020-10-22 14:17:00.748991FixMatchModel_CIFAR10_EMA.state_dict')
+parser.add_argument('--name_model_specs', type=str, default='2020-10-23 17:51:33.557705FixMatchModel_CIFAR10_EMA.state_dict')
 parser.add_argument('--use_database', type=str, default='CIFAR10')
 parser.add_argument('--task', type=str, default='test')
 
@@ -55,14 +55,16 @@ if __name__ == "__main__":
     model_directory = os.path.expanduser(args.save_dir)
     
     model = WideResNet(3, 28, 2, 10)
-    state_dict = torch.load(os.path.join(model_directory, args.name_model_specs))
+    state_dict = torch.load(os.path.join(model_directory, args.name_model_specs)) 
+    for k, v in state_dict.items():
+        state_dict[k] = v.cpu()
     model.load_state_dict(state_dict)
 
     correct, total  = 0, 0
     model.eval()
     with torch.no_grad(): #Turn off gradients
         for X, Y in tqdm(test_loader):
-            y       = np.argmax(model(X.to(device)).cpu().numpy(), axis=1) == Y.numpy()
+            y       = np.argmax(model(X).cpu().numpy(), axis=1) == Y.numpy()
             total  += len(y)
             correct += np.sum(y)
 

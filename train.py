@@ -37,6 +37,7 @@ parser.add_argument('--lr', type= float, default=0.03)
 parser.add_argument('--momentum', type= float, default=0.9)
 parser.add_argument('--nesterov', type= bool, default=True)
 parser.add_argument('--weight_decay', type= float, default=0.0005)
+parser.add_argument('--num_workers', type=list, nargs='+', default=[1,1,3])
 
 # To Do
 parser.add_argument('--UKF_noise_regularizer', type=bool, default=False)
@@ -117,7 +118,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             
             tb_writer.add_scalar('Loss/train', loss, itertrain)
             tb_writer.add_scalar('Psudolabel_num/train', lossfunc.pseudolabels_num, itertrain)
-            tb_writer.add_scalar('Learning_Rate/train', optimizer.param_groups[0]['lr'])
+            tb_writer.add_scalar('Learning_Rate/train', optimizer.param_groups[0]['lr'], itertrain)
             loss.backward()
             optimizer.step()
             scheduler.step()
@@ -218,9 +219,9 @@ if __name__ == "__main__":
     unlabeled_collate = functools.partial(collate_fn_strong, probe=False)
     labeled_collate   = functools.partial(collate_fn_strong, probe=True)
 
-    v_loader    = DataLoader(validation_dataset, batch_size = (mu + 1)*B, collate_fn = default_collate_fn, num_workers=1, pin_memory = True, shuffle=True)
-    lbl_loader    = DataLoader(labeled_dataset, batch_size = B, collate_fn = labeled_collate, num_workers = 1, pin_memory = True, shuffle=True)
-    ulbl_loader   = DataLoader(unlabeled_dataset, batch_size = mu*B, collate_fn = unlabeled_collate, num_workers = 3, pin_memory = True, shuffle=True)
+    v_loader    = DataLoader(validation_dataset, batch_size = (mu + 1)*B, collate_fn = default_collate_fn, num_workers=args.num_workers[0], pin_memory = True, shuffle=True)
+    lbl_loader    = DataLoader(labeled_dataset, batch_size = B, collate_fn = labeled_collate, num_workers = args.num_workers[1], pin_memory = True, shuffle=True)
+    ulbl_loader   = DataLoader(unlabeled_dataset, batch_size = mu*B, collate_fn = unlabeled_collate, num_workers = args.num_workers[2], pin_memory = True, shuffle=True)
 
 
     #  Model Settings
