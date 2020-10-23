@@ -6,7 +6,8 @@ import argparse
 # from torchvision.transforms import ToTensor
 from scheduler.cosineLRreduce import cosineLRreduce
 from torch.nn import functional as F
-from data.data import DataSet, Augmentation, CustomLoader, cutout
+from data.data import DataSet, Augmentation, CustomLoader
+from data.ctaugment import cutout
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from models.EMA import EMA
