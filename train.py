@@ -11,6 +11,7 @@ from data.ctaugment import cutout
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from models.EMA import EMA
+import functools
 import datetime
 import numpy as np
 import os
@@ -114,14 +115,19 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             ema.update()
 
             # CT augment update
-            if confidence_sum > confidence_threshold:
+            if confidence_sum > confidence_threshold or True: #TODO remove or True ONLY FOR DEBUG PURPOSES
                 #network not mature for CTaugment
                 model.eval()
-                # TORCH NO GRAD
                 with torch.no_grad():
                     pred = model(x_strong.to(device)).softmax(1)
-                    mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device))
-                    augmentation.update(x_policy, 1 - 0.5*mae)
+                    #mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device), reduction = 'none').sum(axis=1)
+                    for y_pred, t, policy in zip(pred, x_labels, x_policy):
+                        error = y_pred
+                        error[t] -= 1
+                        error = torch.abs(error).sum()
+                        augmentation.update(policy, 1 - 0.5*error.item())
+
+                    #augmentation.update(x_policy, 1 - 0.5*mae)
             bar.update(1)
 
             # validation
@@ -149,16 +155,16 @@ def collate_fn_weak(ims):
 
     return torch.stack(tensors), torch.LongTensor(labels)
 
-def collate_fn_strong(ims):
+def collate_fn_strong(ims, probe = False):
     global augmentation
     # print("previous_rates ", augmentation.cta.rates['autocontrast'][0])
-    strong = augmentation.strong_batch(ims)
+    strong = augmentation.strong_batch(ims, probe)
     weak   = collate_fn_weak(ims)
     
-    tensors, labels = [torch.tensor(x[0]) for x in strong], [x[1] for x in strong]
+    tensors, labels, policy = [torch.tensor(x[0]) for x in strong], [x[1] for x in strong], [x[2] for x in strong]
     s = torch.stack(tensors)
 
-    labels, policy = [x[0] for x in labels], labels[0][1]
+    #labels, policy = [x[0] for x in labels], labels[0][1]
 
     return s, weak[0], torch.LongTensor(labels), policy #, augmentation.cta.rates['autocontrast'][0]
 
@@ -200,9 +206,13 @@ if __name__ == "__main__":
     # Creating Data Loaders
 
     
+    unlabeled_collate = functools.partial(collate_fn_strong, probe=False)
+    labeled_collate   = functools.partial(collate_fn_strong, probe=True)
+
     v_loader    = DataLoader(validation_dataset, batch_size = (mu + 1)*B, collate_fn = default_collate_fn, num_workers=1, pin_memory = True, shuffle=True)
-    lbl_loader    = DataLoader(labeled_dataset, batch_size = B, collate_fn = collate_fn_strong, num_workers = 1, pin_memory = True, shuffle=True)
-    ulbl_loader   = DataLoader(unlabeled_dataset, batch_size = mu*B, collate_fn = collate_fn_strong, num_workers = 3, pin_memory = True, shuffle=True)
+    lbl_loader    = DataLoader(labeled_dataset, batch_size = B, collate_fn = labeled_collate, num_workers = 1, pin_memory = True, shuffle=True)
+    ulbl_loader   = DataLoader(unlabeled_dataset, batch_size = mu*B, collate_fn = unlabeled_collate, num_workers = 3, pin_memory = True, shuffle=True)
+
 
     #  Model Settings
 

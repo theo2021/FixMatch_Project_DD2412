@@ -39,10 +39,14 @@ class Augmentation:
     def weak_batch(self, x):
         return [(self.weak(im[0]), im[1]) for im in x]
     
-    def strong_batch(self, x):
-        policy = self.cta.policy(True)
+    def strong_batch(self, x, probe):
 
-        return ([(apply(np.array(im[0]), policy), (im[1], policy)) for im in x])
+        batch = []
+
+        for img, label in x:
+            policy = self.cta.policy(probe)
+            batch.append((apply(np.array(img), policy), label, policy))
+        return batch
 
     def strong(self, x):
         policy = self.cta.policy(True)
