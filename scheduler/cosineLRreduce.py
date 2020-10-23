@@ -7,7 +7,7 @@ class cosineLRreduce(_LRScheduler):
     def __init__(self, optimizer, K, warmup=None):
         self.optimizer = optimizer
         self.K = K
-        self.warm = 1.0*K/100 if warmup is None else warmup # default 1/100 of total training
+        self.warm = 1.0*K/100 if warmup is None else warmup*K # default 1/100 of total training
         self.state = 0 # indicates state, 0 init, 1 warmup, 2 cosine
         super(cosineLRreduce, self).__init__(optimizer)
 

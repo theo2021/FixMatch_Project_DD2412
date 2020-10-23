@@ -31,6 +31,7 @@ parser.add_argument('--K', type = int, default = 1000)    # 220
 parser.add_argument('--mu', type = int, default = 7)     # 7
 parser.add_argument('--labels_per_class', type = int, default = 100)
 parser.add_argument('--confidence_threshold', type = int, default = 15)
+parser.add_argument('--warmup_scheduler', type = float, default = 0.1)
 
 # To Do
 parser.add_argument('--UKF_noise_regularizer', type=bool, default=False)
@@ -210,7 +211,7 @@ if __name__ == "__main__":
     ema.register()
 
     optimizer = torch.optim.SGD(model.parameters(), lr=0.003, momentum=0.9, weight_decay=0.0005, nesterov=True) # lr should be 0.03
-    scheduler = cosineLRreduce(optimizer, K)
+    scheduler = cosineLRreduce(optimizer, K, warmup=args.warmup_scheduler)
 
     train_fixmatch(model,ema, zip(lbl_loader, ulbl_loader), v_loader, augmentation, optimizer, scheduler, device, K, tb_writer)
     tb_writer.close()
