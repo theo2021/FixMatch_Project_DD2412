@@ -23,6 +23,7 @@ parser.add_argument('--root', type=str, default='~/databases/')              #su
 parser.add_argument('--save_dir', type=str, default='~/DeepLearningModels/')
 parser.add_argument('--name_model_specs', type=str, default='FixMatchModel')
 parser.add_argument('--use_database', type=str, default='CIFAR10')
+parser.add_argument('--validation_split', type=float, default=0.9)
 parser.add_argument('--task', type=str, default='train')
 
 # parsed in main
@@ -31,7 +32,11 @@ parser.add_argument('--K', type = int, default = 1000)    # 220
 parser.add_argument('--mu', type = int, default = 7)     # 7
 parser.add_argument('--labels_per_class', type = int, default = 100)
 parser.add_argument('--confidence_threshold', type = int, default = 15)
-parser.add_argument('--warmup_scheduler', type = float, default = 0.1)
+parser.add_argument('--warmup_scheduler', type = float, default=None) #None, will to 1% of training
+parser.add_argument('--lr', type= float, default=0.03)
+parser.add_argument('--momentum', type= float, default=0.9)
+parser.add_argument('--nesterov', type= bool, default=True)
+parser.add_argument('--weight_decay', type= float, default=0.0005)
 
 # To Do
 parser.add_argument('--UKF_noise_regularizer', type=bool, default=False)
@@ -45,18 +50,20 @@ augmentation  = Augmentation()
 
 
 class fixmatch_Loss():
-
+    
     def __init__(self, l=1, threshold=0.95):
         self.u_weight          = l
         self.tau               = threshold
+        self.pseudolabels_num = 0
 
     def __call__(self, labeled_prediction, labeled_labels,
                  unlabeled_weak_predictions, unlabeled_strong_predictions):
         supervised             = F.cross_entropy(labeled_prediction, labeled_labels)
         max_pred, pseudolabels = unlabeled_weak_predictions.softmax(1).max(axis=1)
         indexes_over_threshold = max_pred > self.tau
-        if indexes_over_threshold.sum() > 0:
-            total, over        = indexes_over_threshold.size()[0], indexes_over_threshold.sum()
+        self.pseudolabels_num = indexes_over_threshold.sum()
+        if self.pseudolabels_num > 0:
+            total, over        = indexes_over_threshold.size()[0], self.pseudolabels_num
             unsupervised       = (over / total) * F.cross_entropy(unlabeled_strong_predictions[indexes_over_threshold], pseudolabels[indexes_over_threshold])
         else:
             return supervised
@@ -109,6 +116,8 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             print('over_confidence', confidence_sum, 'lr', optimizer.param_groups[0]['lr'])
             
             tb_writer.add_scalar('Loss/train', loss, itertrain)
+            tb_writer.add_scalar('Psudolabel_num/train', lossfunc.pseudolabels_num, itertrain)
+            tb_writer.add_scalar('Learning_Rate/train', optimizer.param_groups[0]['lr'])
             loss.backward()
             optimizer.step()
             scheduler.step()
@@ -220,7 +229,7 @@ if __name__ == "__main__":
     ema = EMA(model, decay = 0.999)
     ema.register()
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.03/4, momentum=0.9, weight_decay=0.0005, nesterov=True) # lr should be 0.03
+    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay, nesterov=args.nesterov)
     scheduler = cosineLRreduce(optimizer, K, warmup=args.warmup_scheduler)
 
     train_fixmatch(model,ema, zip(lbl_loader, ulbl_loader), v_loader, augmentation, optimizer, scheduler, device, K, tb_writer)
