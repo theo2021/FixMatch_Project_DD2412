@@ -6,7 +6,7 @@ import argparse
 # from torchvision.transforms import ToTensor
 from scheduler.cosineLRreduce import cosineLRreduce
 from torch.nn import functional as F
-from data.data import DataSet, Augmentation, CustomLoader
+from data.data import DataSet, Augmentation, CustomLoader, cutout
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from models.EMA import EMA
@@ -85,7 +85,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
                 
                 with torch.no_grad():
                     unlabeled_predictions    = model(u_weak.to(device))
-                unlabeled_strong_predictions = model(u_strong.to(device))
+                unlabeled_strong_predictions = model(cutout(u_strong, levels = 1).to(device))
                 
                 
                 '''
