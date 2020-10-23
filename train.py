@@ -87,7 +87,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
                 
                 with torch.no_grad():
                     unlabeled_predictions    = model(u_weak.to(device))
-                unlabeled_strong_predictions = model(cutout(u_strong, level = 1).to(device))
+                unlabeled_strong_predictions = model(u_strong.to(device))
                 
                 
                 '''
@@ -220,7 +220,7 @@ if __name__ == "__main__":
     ema = EMA(model, decay = 0.999)
     ema.register()
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.003, momentum=0.9, weight_decay=0.0005, nesterov=True) # lr should be 0.03
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.03/4, momentum=0.9, weight_decay=0.0005, nesterov=True) # lr should be 0.03
     scheduler = cosineLRreduce(optimizer, K, warmup=args.warmup_scheduler)
 
     train_fixmatch(model,ema, zip(lbl_loader, ulbl_loader), v_loader, augmentation, optimizer, scheduler, device, K, tb_writer)
