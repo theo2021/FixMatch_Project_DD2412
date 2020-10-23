@@ -23,7 +23,6 @@ parser.add_argument('--save_dir', type=str, default='~/DeepLearningModels/')
 parser.add_argument('--name_model_specs', type=str, default='FixMatchModel')
 parser.add_argument('--use_database', type=str, default='CIFAR10')
 parser.add_argument('--task', type=str, default='train')
-parser.add_argument('--batchsize', type=int, default=2)
 
 # parsed in main
 parser.add_argument('--B', type = int, default = 16)     # 64
@@ -101,6 +100,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
                 unlabeled_predictions, unlabeled_strong_predictions = torch.split(predictions_unlbl_unified, split_size_or_sections=args.mu*args.B, dim=0)
                 #print(unlabeled_predictions.shape)
                 '''
+                
                 loss                                                = lossfunc(labeled_predictions, x_labels.to(device), unlabeled_predictions, unlabeled_strong_predictions)
                 
                 
