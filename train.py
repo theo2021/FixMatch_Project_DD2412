@@ -27,17 +27,20 @@ parser.add_argument('--validation_split', type=float, default=0.9)
 parser.add_argument('--task', type=str, default='train')
 
 # parsed in main
-parser.add_argument('--B', type = int, default = 16)     # 64
+parser.add_argument('--B', type = int, default = 32)     # 64
 parser.add_argument('--K', type = int, default = 1000)    # 220
 parser.add_argument('--mu', type = int, default = 7)     # 7
 parser.add_argument('--labels_per_class', type = int, default = 100)
 parser.add_argument('--confidence_threshold', type = int, default = 15)
-parser.add_argument('--warmup_scheduler', type = float, default=None) #None, will to 1% of training
+parser.add_argument('--warmup_scheduler', type = float, default=0.05) #none, will to 1% of training
 parser.add_argument('--lr', type= float, default=0.03)
 parser.add_argument('--momentum', type= float, default=0.9)
 parser.add_argument('--nesterov', type= bool, default=True)
 parser.add_argument('--weight_decay', type= float, default=0.0005)
-parser.add_argument('--num_workers', type=list, nargs='+', default=[1,1,3])
+parser.add_argument('--num_workers1', type=int, default=1)
+parser.add_argument('--num_workers2', type=int, default=2)
+parser.add_argument('--num_workers3', type=int, default=3)
+
 
 # To Do
 parser.add_argument('--UKF_noise_regularizer', type=bool, default=False)
@@ -219,9 +222,9 @@ if __name__ == "__main__":
     unlabeled_collate = functools.partial(collate_fn_strong, probe=False)
     labeled_collate   = functools.partial(collate_fn_strong, probe=True)
 
-    v_loader    = DataLoader(validation_dataset, batch_size = (mu + 1)*B, collate_fn = default_collate_fn, num_workers=args.num_workers[0], pin_memory = True, shuffle=True)
-    lbl_loader    = DataLoader(labeled_dataset, batch_size = B, collate_fn = labeled_collate, num_workers = args.num_workers[1], pin_memory = True, shuffle=True)
-    ulbl_loader   = DataLoader(unlabeled_dataset, batch_size = mu*B, collate_fn = unlabeled_collate, num_workers = args.num_workers[2], pin_memory = True, shuffle=True)
+    v_loader      = DataLoader(validation_dataset, batch_size = (mu + 1)*B, collate_fn = default_collate_fn, num_workers=args.num_workers1, pin_memory = True, shuffle=True)
+    lbl_loader    = DataLoader(labeled_dataset, batch_size = B, collate_fn = labeled_collate, num_workers = args.num_workers2, pin_memory = True, shuffle=True)
+    ulbl_loader   = DataLoader(unlabeled_dataset, batch_size = mu*B, collate_fn = unlabeled_collate, num_workers = args.num_workers3, pin_memory = True, shuffle=True)
 
 
     #  Model Settings

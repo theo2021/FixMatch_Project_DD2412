@@ -15,7 +15,7 @@ nvidia-smi
 conda activate smarc_env
 mkdir /local_storage/datasets/afnl/fixmatch_save
 mkdir /local_storage/datasets/afnl/fixmatch_data
-python3 /Midgard/home/afnl/FIXMATCHPROJ/FixMatchProj/FixMatch_Project_DD2412/train.py --root='/local_storage/datasets/afnl/fixmatch_data' --download=True --use_database='CIFAR10' --task='train' --save_dir='/local_storage/datasets/afnl/fixmatch_save/' --B=64 --K=10000 --mu=7 --tbsw_logdir='/local_storage/datasets/afnl/fixmatch_save/' --labels_per_class=400 --confidence_threshold=50 --lr=0.03 --momentum=0.9 --weight_decay=0.0005 --warmup_scheduler=0.3 --num_workers=[5,2,5]
+python3 /Midgard/home/afnl/FIXMATCHPROJ/FixMatchProj/FixMatch_Project_DD2412/train.py --root='/local_storage/datasets/afnl/fixmatch_data' --download=True --use_database='CIFAR10' --task='train' --save_dir='/local_storage/datasets/afnl/fixmatch_save/' --B=64 --K=40000 --mu=7 --tbsw_logdir='/local_storage/datasets/afnl/fixmatch_save/' --labels_per_class=4 --confidence_threshold=15 --lr=0.03 --momentum=0.9 --weight_decay=0.0005 --warmup_scheduler=0.05 --num_workers 5 3 5
 cp -r /local_storage/datasets/afnl/fixmatch_save /Midgard/home/afnl/Results
 
 
