@@ -28,6 +28,8 @@ parser.add_argument('--batchsize', type=int, default=2)
 parser.add_argument('--B', type = int, default = 16)     # 64
 parser.add_argument('--K', type = int, default = 1000)    # 220
 parser.add_argument('--mu', type = int, default = 7)     # 7
+parser.add_argument('--labels_per_class', type = int, default = 100)
+parser.add_argument('--confidence_threshold', type = int, default = 15)
 
 # To Do
 parser.add_argument('--UKF_noise_regularizer', type=bool, default=False)
@@ -59,9 +61,10 @@ class fixmatch_Loss():
         return supervised + self.u_weight * unsupervised
 
 
+
 def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, optimizer, scheduler, device, K, tb_writer):
     # if model is confident for this threshold start the unlabeled and ctaugment
-    confidence_threshold     = 35
+    confidence_threshold     = args.confidence_threshold
     confidence_sum           = 0
     lossfunc                 = fixmatch_Loss()
     run_validation           = 200
@@ -78,11 +81,13 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
                 confidence_sum += (labeled_predictions.softmax(1).max(axis=1)[0] > 0.95).sum()
                 loss            = F.cross_entropy(labeled_predictions.to(device), x_labels.to(device))
             else:
-                u_strong, u_weak, u_labels, u_policy = ulabel_loader          
+                u_strong, u_weak, u_labels, u_policy = ulabel_loader
                 
                 with torch.no_grad():
                     unlabeled_predictions    = model(u_weak.to(device))
                 unlabeled_strong_predictions = model(u_strong.to(device))
+                
+                
                 '''
                 u_weak                               = u_weak.to(device)
                 u_weak.requires_grad                 = False
@@ -95,6 +100,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
                 #print(unlabeled_predictions.shape)
                 '''
                 loss                                                = lossfunc(labeled_predictions, x_labels.to(device), unlabeled_predictions, unlabeled_strong_predictions)
+                
                 
             print('train loss:', loss)
             print('over_confidence', confidence_sum, 'lr', optimizer.param_groups[0]['lr'])
@@ -109,6 +115,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             if confidence_sum > confidence_threshold:
                 #network not mature for CTaugment
                 model.eval()
+                # TORCH NO GRAD
                 with torch.no_grad():
                     pred = model(x_strong.to(device)).softmax(1)
                     mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device))
@@ -180,7 +187,7 @@ if __name__ == "__main__":
 
     
     # Creating Dataset
-    labels_per_class  = [100 for _ in range(10)]
+    labels_per_class  = [args.labels_per_class for _ in range(10)]
     dataset_loader    = CustomLoader(labels_per_class = labels_per_class, db_dir = args.root, db_name = args.use_database, mode = args.task, download = args.download)
     dataset_loader.load()
 
