@@ -35,11 +35,12 @@ def register(*bins):
 def apply(x, ops):
     if ops is None:
         return x
-    y = Image.fromarray(np.round(127.5 * (1 + x)).clip(0, 255).astype('uint8'))
+    y = Image.fromarray(x.astype('uint8'))
     for op, args in ops:
         y = OPS[op].f(y, *args)
-    return (np.asarray(y).astype('f') / 255).transpose(2, 0, 1)
-
+    lvl = random.uniform(0, 0.5)
+    y = cutout(y, lvl)
+    return np.asarray(y).astype('f') / 255
 
 class CTAugment:
     def __init__(self, depth=2, th=0.85, decay=0.99):
