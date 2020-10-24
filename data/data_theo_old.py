@@ -16,7 +16,6 @@ from .ctaugment import CTAugment, apply
 import time
 from torch.utils.tensorboard import SummaryWriter
 
-'''
 parser = argparse.ArgumentParser(description='Dataset')
 
 parser.add_argument('--download', type=bool, default=True)
@@ -26,7 +25,7 @@ parser.add_argument('--task', type=str, default='train')
 parser.add_argument('--batchsize', type=int, default=2)
 
 args = parser.parse_args()
-'''
+
 
 #https://www.cs.toronto.edu/~kriz/cifar.html
 #http://ufldl.stanford.edu/housenumbers/
@@ -39,14 +38,10 @@ class Augmentation:
     def weak_batch(self, x):
         return [(self.weak(im[0]), im[1]) for im in x]
     
-    def strong_batch(self, x, probe):
-    
-        batch = []
+    def strong_batch(self, x):
+        policy = self.cta.policy(True)
 
-        for img, label in x:
-            policy = self.cta.policy(probe)
-            batch.append((apply(np.array(img), policy), label, policy))
-        return batch
+        return ([(apply(np.array(im[0]), policy), (im[1], policy)) for im in x])
 
     def strong(self, x):
         policy = self.cta.policy(True)
@@ -57,8 +52,8 @@ class Augmentation:
         self.cta.update_rates(policy, accuracy)
 
     def __weak(self):
-        transforms = torchvision.transforms.Compose([torchvision.transforms.RandomHorizontalFlip(p=0.5),
-                     torchvision.transforms.RandomAffine(0, translate=(0.125, 0.125)),
+        transforms = torchvision.transforms.Compose([#torchvision.transforms.RandomHorizontalFlip(p=0.5),
+                     #torchvision.transforms.RandomAffine(0, translate=(0.125, 0.125)),
                      torchvision.transforms.ToTensor()])
 
         return transforms
@@ -226,7 +221,6 @@ def collate_fn_strong(ims):
 
     return s, weak[0], torch.LongTensor(labels), policy#, augmentation.cta.rates['autocontrast'][0]
 
-'''
 if __name__ == "__main__":
    
     labels_per_class  = [10 for _ in range(10)]
@@ -294,8 +288,7 @@ if __name__ == "__main__":
         
     end = time.time()
     print(end-start)
-'''
-'''
+    '''
     #TIME TEST
     start = time.time()
     for (ub, b, lbl) in loader:
@@ -305,8 +298,7 @@ if __name__ == "__main__":
     end = time.time()
     print((((end - start)/loader.K) *2**20)/(60*60), 'h' )
     #print(X)
-'''
-'''
+    '''
 
 
     
@@ -318,4 +310,3 @@ if __name__ == "__main__":
 
 
     #print(augmented_dataset.__getitem__(0))
-'''

@@ -58,13 +58,24 @@ class fixmatch_Loss():
     def __init__(self, l=1, threshold=0.95):
         self.u_weight          = l
         self.tau               = threshold
-        self.pseudolabels_num = 0
+
+    def get_pseudo(self, unlabeled_weak_predictions):
+        max_pred, pseudolabels = unlabeled_weak_predictions.softmax(1).max(axis=1)
+        indexes_over_threshold = max_pred > self.tau
+        return indexes_over_threshold, pseudolabels
+
+    def calculate_losses(self, labeled_prediction, labeled_labels, unlabeled_strong_predictions, pseudolabels, usize):
+        supervised = F.cross_entropy(labeled_prediction, labeled_labels)
+        if pseudolabels.size()[0] > 0:
+            unsupervised = F.cross_entropy(unlabeled_strong_predictions, pseudolabels, reduce='sum')/usize
+        else:
+            unsupervised = 0
+        return supervised + self.u_weight*unsupervised, supervised, unsupervised
 
     def __call__(self, labeled_prediction, labeled_labels,
                  unlabeled_weak_predictions, unlabeled_strong_predictions):
         supervised             = F.cross_entropy(labeled_prediction, labeled_labels)
-        max_pred, pseudolabels = unlabeled_weak_predictions.softmax(1).max(axis=1)
-        indexes_over_threshold = max_pred > self.tau
+        indexes_over_threshold, pseudolabels = self.get_pseudo(unlabeled_weak_predictions)
         self.pseudolabels_num = indexes_over_threshold.sum()
         if self.pseudolabels_num > 0:
             total, over        = indexes_over_threshold.size()[0], self.pseudolabels_num
@@ -77,8 +88,6 @@ class fixmatch_Loss():
 
 def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, optimizer, scheduler, device, K, tb_writer):
     # if model is confident for this threshold start the unlabeled and ctaugment
-    confidence_threshold     = args.confidence_threshold
-    confidence_sum           = 0
     lossfunc                 = fixmatch_Loss()
     run_validation           = 200
     with tqdm(total = K) as bar:
@@ -86,61 +95,43 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
         for i, (label_load, ulabel_loader) in enumerate(trainloader):
             #  Unpacking variables
             x_strong, x_weak, x_labels, x_policy = label_load
+            u_strong, u_weak, u_labels, u_policy = ulabel_loader
             model.train()
             optimizer.zero_grad()
-            labeled_predictions                  = model(x_weak.to(device))  # weak
-            if confidence_sum < confidence_threshold:
-                # no need to train the whole network at start since network isn't even confident for the training predictions
-                confidence_sum += (labeled_predictions.softmax(1).max(axis=1)[0] > 0.95).sum()
-                loss            = F.cross_entropy(labeled_predictions.to(device), x_labels.to(device))
-            else:
-                u_strong, u_weak, u_labels, u_policy = ulabel_loader
-                
-                with torch.no_grad():
-                    unlabeled_predictions    = model(u_weak.to(device))
-                unlabeled_strong_predictions = model(u_strong.to(device))
-                
-                
-                '''
-                u_weak                               = u_weak.to(device)
-                u_weak.requires_grad                 = False
-                #print(u_weak.requires_grad)
-                u_strong                             = u_strong.to(device)
-                u_unified                            = torch.cat((u_weak, u_strong), dim = 0)
-                #print(u_unified.shape)
-                predictions_unlbl_unified                           = model(u_unified)
-                unlabeled_predictions, unlabeled_strong_predictions = torch.split(predictions_unlbl_unified, split_size_or_sections=args.mu*args.B, dim=0)
-                #print(unlabeled_predictions.shape)
-                '''
-                
-                loss                                                = lossfunc(labeled_predictions, x_labels.to(device), unlabeled_predictions, unlabeled_strong_predictions)
-                
-                
-            print('train loss:', loss)
-            print('over_confidence', confidence_sum, 'lr', optimizer.param_groups[0]['lr'])
-            
-            tb_writer.add_scalar('Loss/train', loss, itertrain)
-            tb_writer.add_scalar('Psudolabel_num/train', lossfunc.pseudolabels_num, itertrain)
-            tb_writer.add_scalar('Learning_Rate/train', optimizer.param_groups[0]['lr'], itertrain)
-            loss.backward()
+            with torch.no_grad():
+                unlabeled_predictions    = model(u_weak.to(device))
+            indexes, pseudolabels = lossfunc.get_pseudo(unlabeled_predictions)
+
+            strongly_augmented_selected = u_strong[indexes].to(device)
+            input_batch = torch.cat((x_weak.to(device), strongly_augmented_selected), 0)
+            p_num = indexes.sum()
+            labeled_predictions, unlabeled_strong_predictions = torch.split(model(input_batch), [x_weak.size()[0], p_num])
+
+            t_loss, s_loss, u_loss = lossfunc.calculate_losses(labeled_predictions, x_labels, unlabeled_strong_predictions, pseudolabels[indexes], indexes.size()[0])
+            t_loss.backward()
             optimizer.step()
             scheduler.step()
             ema.update()
 
-            # CT augment update
-            if confidence_sum > confidence_threshold or True: #TODO remove or True ONLY FOR DEBUG PURPOSES
-                #network not mature for CTaugment
-                model.eval()
-                with torch.no_grad():
-                    pred = model(x_strong.to(device)).softmax(1)
-                    #mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device), reduction = 'none').sum(axis=1)
-                    for y_pred, t, policy in zip(pred, x_labels, x_policy):
-                        error = y_pred
-                        error[t] -= 1
-                        error = torch.abs(error).sum()
-                        augmentation.update(policy, 1 - 0.5*error.item())
+            tb_writer.add_scalar('Loss/train', t_loss, itertrain)
+            tb_writer.add_scalar('SupervisedLoss/train', s_loss, itertrain)
+            tb_writer.add_scalar('UnsupervisedLoss/train', u_loss, itertrain)
+            tb_writer.add_scalar('Psudolabel_num/train', p_num, itertrain)
+            tb_writer.add_scalar('Learning_Rate/train', optimizer.param_groups[0]['lr'], itertrain)
 
-                    #augmentation.update(x_policy, 1 - 0.5*mae)
+            # CT augment update
+                #network not mature for CTaugment
+            model.eval()
+            with torch.no_grad():
+                pred = model(x_strong.to(device)).softmax(1)
+                #mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device), reduction = 'none').sum(axis=1)
+                for y_pred, t, policy in zip(pred, x_labels, x_policy):
+                    error = y_pred
+                    error[t] -= 1
+                    error = torch.abs(error).sum()
+                    augmentation.update(policy, 1 - 0.5*error.item())
+
+                #augmentation.update(x_policy, 1 - 0.5*mae)
             bar.update(1)
 
             # validation
