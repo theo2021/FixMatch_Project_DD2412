@@ -67,7 +67,7 @@ class fixmatch_Loss():
     def calculate_losses(self, labeled_prediction, labeled_labels, unlabeled_strong_predictions, pseudolabels, usize):
         supervised = F.cross_entropy(labeled_prediction, labeled_labels)
         if pseudolabels.size()[0] > 0:
-            unsupervised = F.cross_entropy(unlabeled_strong_predictions, pseudolabels, reduce='sum')/usize
+            unsupervised = F.cross_entropy(unlabeled_strong_predictions, pseudolabels, reduction='sum')/usize
         else:
             unsupervised = 0
         return supervised + self.u_weight*unsupervised, supervised, unsupervised
@@ -86,15 +86,15 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             x_strong, x_weak, x_labels, x_policy = label_load
             u_strong, u_weak, u_labels, u_policy = ulabel_loader
             model.train()
-            optimizer.zero_grad()
             with torch.no_grad():
                 unlabeled_predictions    = model(u_weak.to(device))
                 indexes, pseudolabels = lossfunc.get_pseudo(unlabeled_predictions)
 
-            strongly_augmented_selected = u_strong[indexes].to(device)
-            input_batch = torch.cat((x_weak.to(device), strongly_augmented_selected), 0)
+            optimizer.zero_grad()
+            strongly_augmented_selected = u_strong[indexes]
+            input_batch = torch.cat((x_weak, strongly_augmented_selected), 0)
             p_num = indexes.sum()
-            labeled_predictions, unlabeled_strong_predictions = torch.split(model(input_batch), [x_weak.size()[0], p_num])
+            labeled_predictions, unlabeled_strong_predictions = torch.split(model(input_batch.to(device)), [x_weak.size()[0], p_num])
 
             t_loss, s_loss, u_loss = lossfunc.calculate_losses(labeled_predictions, x_labels.to(device), unlabeled_strong_predictions, pseudolabels[indexes], indexes.size()[0])
             t_loss.backward()
