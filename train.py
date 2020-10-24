@@ -89,7 +89,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             optimizer.zero_grad()
             with torch.no_grad():
                 unlabeled_predictions    = model(u_weak.to(device))
-            indexes, pseudolabels = lossfunc.get_pseudo(unlabeled_predictions)
+                indexes, pseudolabels = lossfunc.get_pseudo(unlabeled_predictions)
 
             strongly_augmented_selected = u_strong[indexes].to(device)
             input_batch = torch.cat((x_weak.to(device), strongly_augmented_selected), 0)
@@ -165,7 +165,7 @@ def collate_fn_strong(ims, probe = False):
 
 def default_collate_fn(ims):
     
-    tensors, labels = [torch.FloatTensor(np.array(x[0]).transpose(2, 0, 1))/255 for x in ims], [x[1] for x in ims]
+    tensors, labels = [torch.FloatTensor((np.asarray(x[0]).astype('f').transpose(2, 0, 1))/255 - 0.5)/0.5 for x in ims], [x[1] for x in ims]
 
     s = torch.stack(tensors)
 

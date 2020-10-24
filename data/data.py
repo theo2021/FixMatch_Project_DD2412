@@ -45,7 +45,7 @@ class Augmentation:
 
         for img, label in x:
             policy = self.cta.policy(probe)
-            batch.append((apply(np.array(img), policy), label, policy))
+            batch.append((apply(img, policy), label, policy))
         return batch
 
     def strong(self, x):
@@ -59,7 +59,8 @@ class Augmentation:
     def __weak(self):
         transforms = torchvision.transforms.Compose([torchvision.transforms.RandomHorizontalFlip(p=0.5),
                      torchvision.transforms.RandomAffine(0, translate=(0.125, 0.125)),
-                     torchvision.transforms.ToTensor()])
+                     torchvision.transforms.ToTensor(),
+                     torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
         return transforms
 
