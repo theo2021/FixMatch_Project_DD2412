@@ -78,6 +78,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
     # if model is confident for this threshold start the unlabeled and ctaugment
     lossfunc                 = fixmatch_Loss()
     run_validation           = 200
+    run_ctaugment            = 10
     with tqdm(total = K) as bar:
         itertrain, iterval   = 0, 0
         for i, (label_load, ulabel_loader) in enumerate(trainloader):
@@ -110,16 +111,17 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             # CT augment update
                 #network not mature for CTaugment
             model.eval()
-            with torch.no_grad():
-                pred = model(x_strong.to(device)).softmax(1)
-                #mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device), reduction = 'none').sum(axis=1)
-                for y_pred, t, policy in zip(pred, x_labels, x_policy):
-                    error = y_pred
-                    error[t] -= 1
-                    error = torch.abs(error).sum()
-                    augmentation.update(policy, 1 - 0.5*error.item())
+            if i % run_ctaugment == 0 and i > 0:
+                with torch.no_grad():
+                    pred = model(x_strong.to(device)).softmax(1)
+                    #mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device), reduction = 'none').sum(axis=1)
+                    for y_pred, t, policy in zip(pred, x_labels, x_policy):
+                        error = y_pred
+                        error[t] -= 1
+                        error = torch.abs(error).sum()
+                        augmentation.update(policy, 1 - 0.5*error.item())
 
-                #augmentation.update(x_policy, 1 - 0.5*mae)
+                    #augmentation.update(x_policy, 1 - 0.5*mae)
             bar.update(1)
 
             # validation
