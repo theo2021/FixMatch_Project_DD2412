@@ -86,8 +86,8 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             x_strong, x_weak, x_labels, x_policy = label_load
             u_strong, u_weak, u_labels, u_policy = ulabel_loader
 
-            model.eval()
             if i % run_ctaugment == 0 and i > 0:
+                model.eval()
                 with torch.no_grad():
                     pred = model(x_strong.to(device)).softmax(1)
                     #mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device), reduction = 'none').sum(axis=1)
@@ -104,11 +104,14 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
 
             optimizer.zero_grad()
             strongly_augmented_selected = u_strong[indexes]
-            input_batch = torch.cat((x_weak, strongly_augmented_selected), 0)
+            # input_batch = torch.cat((x_weak, strongly_augmented_selected), 0)
             p_num = indexes.sum()
-            labeled_predictions, unlabeled_strong_predictions = torch.split(model(input_batch.to(device)), [x_weak.size()[0], p_num])
+            # model_output = model(input_batch.to(device))
+            # labeled_predictions, unlabeled_strong_predictions = torch.split(model_output, [x_weak.size()[0], p_num])
 
-            t_loss, s_loss, u_loss = lossfunc.calculate_losses(labeled_predictions, x_labels.to(device), unlabeled_strong_predictions, pseudolabels[indexes], indexes.size()[0])
+            labeled_predictions = model(x_weak.to(device))
+            unlabeled_strong_predictions = model(u_strong.to(device))
+            t_loss, s_loss, u_loss = lossfunc.calculate_losses(labeled_predictions, x_labels.to(device), unlabeled_strong_predictions[indexes], pseudolabels[indexes], indexes.size()[0])
             t_loss.backward()
             optimizer.step()
             scheduler.step()
