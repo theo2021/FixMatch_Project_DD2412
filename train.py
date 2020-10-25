@@ -78,13 +78,25 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
     # if model is confident for this threshold start the unlabeled and ctaugment
     lossfunc                 = fixmatch_Loss()
     run_validation           = 200
-    run_ctaugment            = 10
+    run_ctaugment            = 5
     with tqdm(total = K) as bar:
         itertrain, iterval   = 0, 0
         for i, (label_load, ulabel_loader) in enumerate(trainloader):
             #  Unpacking variables
             x_strong, x_weak, x_labels, x_policy = label_load
             u_strong, u_weak, u_labels, u_policy = ulabel_loader
+
+            model.eval()
+            if i % run_ctaugment == 0 and i > 0:
+                with torch.no_grad():
+                    pred = model(x_strong.to(device)).softmax(1)
+                    #mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device), reduction = 'none').sum(axis=1)
+                    for y_pred, t, policy in zip(pred, x_labels, x_policy):
+                        error = y_pred
+                        error[t] -= 1
+                        error = torch.abs(error).sum()
+                        augmentation.update(policy, 1 - 0.5*error.item())
+            
             model.train()
             with torch.no_grad():
                 unlabeled_predictions    = model(u_weak.to(device))
@@ -110,16 +122,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
 
             # CT augment update
                 #network not mature for CTaugment
-            model.eval()
-            if i % run_ctaugment == 0 and i > 0:
-                with torch.no_grad():
-                    pred = model(x_strong.to(device)).softmax(1)
-                    #mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device), reduction = 'none').sum(axis=1)
-                    for y_pred, t, policy in zip(pred, x_labels, x_policy):
-                        error = y_pred
-                        error[t] -= 1
-                        error = torch.abs(error).sum()
-                        augmentation.update(policy, 1 - 0.5*error.item())
+            
 
                     #augmentation.update(x_policy, 1 - 0.5*mae)
             bar.update(1)
@@ -173,8 +176,8 @@ def default_collate_fn(ims):
 
 
 if __name__ == "__main__":
-    from models.wideresnet import WideResNet
-    # from models.WideResNet import WideResNet
+    # from models.wideresnet import WideResNet
+    from models.WideResNet import WideResNet
     import torch
     
     # tensorboard writer
@@ -184,8 +187,8 @@ if __name__ == "__main__":
     B         = args.B                         # batch size: 64 ideal
     mu        = args.mu    
     strides = [1, 1, 2, 2]
-    # model = WideResNet(d=28, k=3, n_classes=10, input_features=3, output_features=16, strides=strides)                # prop unsup/sup: 7 ideal
-    model     = WideResNet(3, 28, 2, 10)
+    model = WideResNet(d=28, k=3, n_classes=10, input_features=3, output_features=16, strides=strides)                # prop unsup/sup: 7 ideal
+    #model     = WideResNet(3, 28, 2, 10)
 
     
     # Creating Dataset
