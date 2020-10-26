@@ -230,7 +230,7 @@ if __name__ == "__main__":
     #  Model Settings
 
     model.to(device)
-    ema = EMA(model, decay = 0.999)
+    ema = EMA(model, decay = 0.999, device=device)
     save_models([model, "normal"], [ema.get(), "ema"])
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay, nesterov=args.nesterov)
     scheduler = cosineLRreduce(optimizer, K, warmup=args.warmup_scheduler)
