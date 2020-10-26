@@ -81,6 +81,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
     run_validation           = 200
     run_ctaugment            = 6
     top_val = 0
+    end_warmup = False
     with tqdm(total = K) as bar:
         itertrain, iterval   = 0, 0
         for i, (label_load, ulabel_loader) in enumerate(trainloader):
@@ -88,8 +89,9 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             x_strong, x_weak, x_labels, x_policy = label_load
             u_strong, u_weak, u_labels, u_policy = ulabel_loader
 
-            if i == 60:
+            if scheduler.state == 2 and (end_warmup == False): # if exited warmup phaze
                 ema.re_init(model)
+                end_warmup = True
 
             if i % run_ctaugment == 0 and i > 0:
                 model.eval()
@@ -120,7 +122,8 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             t_loss.backward()
             optimizer.step()
             scheduler.step()
-            ema.update()
+            if end_warmup:
+                ema.update()
 
             tb_writer.add_scalar('Loss/train', t_loss, itertrain)
             tb_writer.add_scalar('SupervisedLoss/train', s_loss, itertrain)

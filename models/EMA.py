@@ -4,7 +4,7 @@ from copy import deepcopy
 class EMA:
     def __init__(self, model, decay = 0.999, device='cpu'):
         self.model  = model
-        self.ema = deepcopy(model)
+        self.ema = deepcopy(model).to(device)
         self.decay  = decay
 
     def re_init(self, model):
