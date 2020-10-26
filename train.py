@@ -41,11 +41,8 @@ parser.add_argument('--weight_decay', type= float, default=0.0005)
 parser.add_argument('--num_workers1', type=int, default=1)
 parser.add_argument('--num_workers2', type=int, default=2)
 parser.add_argument('--num_workers3', type=int, default=3)
-
-
-# To Do
-parser.add_argument('--UKF_noise_regularizer', type=bool, default=False)
-parser.add_argument('--ensemble_model', type=bool, default=False)
+parser.add_argument('--run_ctaugment', type=int, default=6)
+parser.add_argument('--cifar_what', type=int, default=10)
 
 
 
@@ -79,7 +76,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
     # if model is confident for this threshold start the unlabeled and ctaugment
     lossfunc                 = fixmatch_Loss()
     run_validation           = 200
-    run_ctaugment            = 6
+    run_ctaugment            = args.run_ctaugment
     update_bar = 50
     top_val = 0
     end_warmup = False
@@ -196,23 +193,25 @@ def default_collate_fn(ims):
 
 
 if __name__ == "__main__":
-    # from models.wideresnet import WideResNet
-    from models.WideResNet import WideResNet
+    from models.wideresnet import WideResNet
+    #from models.WideResNet import WideResNet
     import torch
     
     # tensorboard writer
+    
     tb_writer = SummaryWriter(log_dir=args.tbsw_logdir)
     device    = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     K         = args.K                         # steps: 2**20 ideal
     B         = args.B                         # batch size: 64 ideal
     mu        = args.mu    
-    strides = [1, 1, 2, 2]
-    model = WideResNet(d=28, k=3, n_classes=10, input_features=3, output_features=16, strides=strides)                # prop unsup/sup: 7 ideal
-    #model     = WideResNet(3, 28, 2, 10)
+    #strides = [1, 1, 2, 2]
+    #model = WideResNet(d=28, k=3, n_classes=10, input_features=3, output_features=16, strides=strides)                # prop unsup/sup: 7 ideal
+    
+    model     = WideResNet(3, 28, 2, 10)
 
     
     # Creating Dataset
-    labels_per_class  = [args.labels_per_class for _ in range(10)]
+    labels_per_class  = [args.labels_per_class for _ in range(args.cifar_what)]
     dataset_loader    = CustomLoader(labels_per_class = labels_per_class, db_dir = args.root, db_name = args.use_database, mode = args.task, download = args.download)
     dataset_loader.load()
 
