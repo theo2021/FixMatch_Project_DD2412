@@ -79,13 +79,17 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
     # if model is confident for this threshold start the unlabeled and ctaugment
     lossfunc                 = fixmatch_Loss()
     run_validation           = 200
-    run_ctaugment            = 5
+    run_ctaugment            = 6
+    top_val = 0
     with tqdm(total = K) as bar:
         itertrain, iterval   = 0, 0
         for i, (label_load, ulabel_loader) in enumerate(trainloader):
             #  Unpacking variables
             x_strong, x_weak, x_labels, x_policy = label_load
             u_strong, u_weak, u_labels, u_policy = ulabel_loader
+
+            if i == 60:
+                ema.re_init(model)
 
             if i % run_ctaugment == 0 and i > 0:
                 model.eval()
@@ -143,11 +147,19 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
                     tb_writer.add_scalar('Accuracy/validation', correct/total, iterval)
 
                     print('Validation on iteration k={0} yielded {1} accuracy'.format(i, correct/total))
+                
+                    if top_val < (correct/total):
+                        save_models([model, 'normal'])
+                        top_val = (correct/total)
 
             itertrain += 1
             iterval   += 1
 
-                
+def save_models(*models, prefix='current_run'):
+    for model, name in models:
+        save_dir = os.path.expanduser(args.save_dir)
+        torch.save(model.cpu().state_dict(), os.path.join(save_dir, prefix + args.name_model_specs + "_" + args.use_database + '_' + name + '.state_dict'))
+
 
 def collate_fn_weak(ims):
     global augmentation
@@ -219,8 +231,7 @@ if __name__ == "__main__":
 
     model.to(device)
     ema = EMA(model, decay = 0.999)
-    ema.register()
-
+    save_models([model, "normal"], [ema.get(), "ema"])
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay, nesterov=args.nesterov)
     scheduler = cosineLRreduce(optimizer, K, warmup=args.warmup_scheduler)
 
@@ -230,11 +241,6 @@ if __name__ == "__main__":
 
     # Save everything
 
-    save_dir, prefix = os.path.expanduser(args.save_dir), str(datetime.datetime.now())
-    
-    torch.save(model.state_dict(), os.path.join(save_dir, prefix + args.name_model_specs + "_" + args.use_database + '.state_dict'))
-    ema.apply_shadow()
-    torch.save(model.state_dict(), os.path.join(save_dir, prefix + args.name_model_specs + "_" + args.use_database + '_EMA' '.state_dict'))
-
+    save_models([model, 'normal'], [ema.get(), 'ema'], '_final_' + str(datetime.datetime.now())
     
     
