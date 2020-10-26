@@ -238,9 +238,7 @@ if __name__ == "__main__":
     train_fixmatch(model,ema, zip(lbl_loader, ulbl_loader), v_loader, augmentation, optimizer, scheduler, device, K, tb_writer)
     tb_writer.close()
 
-
     # Save everything
+    save_models([model, 'normal'], [ema.get(), 'ema'], '_final_' + str(datetime.datetime.now()))
 
-    save_models([model, 'normal'], [ema.get(), 'ema'], '_final_' + str(datetime.datetime.now())
-    
-    
+
