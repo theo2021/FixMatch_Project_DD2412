@@ -161,7 +161,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
 def save_models(*models, prefix='current_run'):
     for model, name in models:
         save_dir = os.path.expanduser(args.save_dir)
-        torch.save(model.cpu().state_dict(), os.path.join(save_dir, prefix + args.name_model_specs + "_" + args.use_database + '_' + name + '.state_dict'))
+        torch.save(model.state_dict(), os.path.join(save_dir, prefix + args.name_model_specs + "_" + args.use_database + '_' + name + '.state_dict'))
 
 
 def collate_fn_weak(ims):
