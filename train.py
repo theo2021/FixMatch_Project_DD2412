@@ -80,6 +80,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
     lossfunc                 = fixmatch_Loss()
     run_validation           = 200
     run_ctaugment            = 6
+    update_bar = 50
     top_val = 0
     end_warmup = False
     with tqdm(total = K) as bar:
@@ -96,7 +97,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             if i % run_ctaugment == 0 and i > 0:
                 model.eval()
                 with torch.no_grad():
-                    pred = model(x_strong.to(device)).softmax(1)
+                    pred = model(x_strong.to(device, non_blocking=True)).softmax(1)
                     #mae = F.l1_loss(pred, torch.zeros(pred.size()).scatter_(1, x_labels.reshape(-1, 1), 1).to(device), reduction = 'none').sum(axis=1)
                     for y_pred, t, policy in zip(pred, x_labels, x_policy):
                         error = y_pred
@@ -106,7 +107,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             
             model.train()
             with torch.no_grad():
-                unlabeled_predictions    = model(u_weak.to(device))
+                unlabeled_predictions    = model(u_weak.to(device, non_blocking=True))
                 indexes, pseudolabels = lossfunc.get_pseudo(unlabeled_predictions)
 
             optimizer.zero_grad()
@@ -116,27 +117,27 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             # model_output = model(input_batch.to(device))
             # labeled_predictions, unlabeled_strong_predictions = torch.split(model_output, [x_weak.size()[0], p_num])
 
-            labeled_predictions = model(x_weak.to(device))
-            unlabeled_strong_predictions = model(u_strong.to(device))
-            t_loss, s_loss, u_loss = lossfunc.calculate_losses(labeled_predictions, x_labels.to(device), unlabeled_strong_predictions[indexes], pseudolabels[indexes], indexes.size()[0])
+            labeled_predictions = model(x_weak.to(device, non_blocking=True))
+            unlabeled_strong_predictions = model(u_strong.to(device, non_blocking=True))
+            t_loss, s_loss, u_loss = lossfunc.calculate_losses(labeled_predictions, x_labels.to(device, non_blocking=True), unlabeled_strong_predictions[indexes], pseudolabels[indexes], indexes.size()[0])
             t_loss.backward()
             optimizer.step()
             scheduler.step()
             if end_warmup:
                 ema.update()
 
-            tb_writer.add_scalar('Loss/train', t_loss, itertrain)
-            tb_writer.add_scalar('SupervisedLoss/train', s_loss, itertrain)
-            tb_writer.add_scalar('UnsupervisedLoss/train', u_loss, itertrain)
-            tb_writer.add_scalar('Psudolabel_num/train', p_num, itertrain)
-            tb_writer.add_scalar('Learning_Rate/train', optimizer.param_groups[0]['lr'], itertrain)
-
+            if i % update_bar == 0: 
+                tb_writer.add_scalar('Loss/train', t_loss, itertrain)
+                tb_writer.add_scalar('SupervisedLoss/train', s_loss, itertrain)
+                tb_writer.add_scalar('UnsupervisedLoss/train', u_loss, itertrain)
+                tb_writer.add_scalar('Psudolabel_num/train', p_num, itertrain)
+                tb_writer.add_scalar('Learning_Rate/train', optimizer.param_groups[0]['lr'], itertrain)
+                bar.update(update_bar)
             # CT augment update
                 #network not mature for CTaugment
             
 
                     #augmentation.update(x_policy, 1 - 0.5*mae)
-            bar.update(1)
 
             # validation
             if i > 0 and i % run_validation == 0:
@@ -144,7 +145,7 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
                 model.eval()
                 with torch.no_grad(): #Turn off gradients
                     for X, Y in validation_loader:
-                        y       = np.argmax(model(X.to(device)).cpu().numpy(), axis=1) == Y.numpy()
+                        y       = np.argmax(model(X.to(device, non_blocking=True)).cpu().numpy(), axis=1) == Y.numpy()
                         total  += len(y)
                         correct += np.sum(y)
                     tb_writer.add_scalar('Accuracy/validation', correct/total, iterval)
