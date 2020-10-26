@@ -242,6 +242,6 @@ if __name__ == "__main__":
     tb_writer.close()
 
     # Save everything
-    save_models([model, 'normal'], [ema.get(), 'ema'], '_final_' + str(datetime.datetime.now()))
+    save_models([model, 'normal'], [ema.get(), 'ema'], prefix='_final_' + str(datetime.datetime.now()))
 
 
