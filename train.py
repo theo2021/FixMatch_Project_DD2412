@@ -12,6 +12,7 @@ from data.ctaugment import transforms as default_transforms
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from models.EMA import EMA
+from models.LqLoss import LqLoss
 import functools
 import datetime
 import numpy as np
@@ -43,6 +44,8 @@ parser.add_argument('--num_workers2', type=int, default=2)
 parser.add_argument('--num_workers3', type=int, default=3)
 parser.add_argument('--run_ctaugment', type=int, default=6)
 parser.add_argument('--cifar_what', type=int, default=10)
+parser.add_argument('--ulqLoss', type=bool, default=True)
+parser.add_argument('--slqLoss', type=bool, default=True)
 
 
 
@@ -50,6 +53,7 @@ args = parser.parse_args()
 
 augmentation  = Augmentation()
 
+lq_loss = LqLoss()
 
 class fixmatch_Loss():
     
@@ -63,9 +67,15 @@ class fixmatch_Loss():
         return indexes_over_threshold, pseudolabels
 
     def calculate_losses(self, labeled_prediction, labeled_labels, unlabeled_strong_predictions, pseudolabels, usize):
-        supervised = F.cross_entropy(labeled_prediction, labeled_labels)
+        if args.slqLoss:
+            supervised = lq_loss(labeled_prediction, labeled_labels)/len(labeled_labels)
+        else:
+            supervised = F.cross_entropy(labeled_prediction, labeled_labels)
         if pseudolabels.size()[0] > 0:
-            unsupervised = F.cross_entropy(unlabeled_strong_predictions, pseudolabels, reduction='sum')/usize
+            if args.ulqLoss:
+                unsupervised = lq_loss(unlabeled_strong_predictions, pseudolabels)/usize
+            else:
+                unsupervised = F.cross_entropy(unlabeled_strong_predictions, pseudolabels, reduction='sum')/usize
         else:
             unsupervised = 0
         return supervised + self.u_weight*unsupervised, supervised, unsupervised
@@ -120,10 +130,11 @@ def train_fixmatch(model, ema, trainloader, validation_loader, augmentation, opt
             t_loss.backward()
             optimizer.step()
             scheduler.step()
+            print(t_loss)
             if end_warmup:
                 ema.update()
 
-            if i % update_bar == 0: 
+            if i > 0 and i % update_bar == 0: 
                 tb_writer.add_scalar('Loss/train', t_loss, itertrain)
                 tb_writer.add_scalar('SupervisedLoss/train', s_loss, itertrain)
                 tb_writer.add_scalar('UnsupervisedLoss/train', u_loss, itertrain)
