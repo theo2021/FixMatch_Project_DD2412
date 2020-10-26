@@ -8,6 +8,7 @@ from scheduler.cosineLRreduce import cosineLRreduce
 from torch.nn import functional as F
 from data.data import DataSet, Augmentation, CustomLoader
 from data.ctaugment import cutout
+from data.ctaugment import transforms as default_transforms
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from models.EMA import EMA
@@ -161,7 +162,7 @@ def collate_fn_strong(ims, probe = False):
     strong = augmentation.strong_batch(ims, probe)
     weak   = collate_fn_weak(ims)
     
-    tensors, labels, policy = [torch.tensor(x[0]) for x in strong], [x[1] for x in strong], [x[2] for x in strong]
+    tensors, labels, policy = [x[0] for x in strong], [x[1] for x in strong], [x[2] for x in strong]
     s = torch.stack(tensors)
 
     #labels, policy = [x[0] for x in labels], labels[0][1]
@@ -171,7 +172,7 @@ def collate_fn_strong(ims, probe = False):
 
 def default_collate_fn(ims):
     
-    tensors, labels = [torch.FloatTensor((np.asarray(x[0]).astype('f').transpose(2, 0, 1))/255 - 0.5)/0.5 for x in ims], [x[1] for x in ims]
+    tensors, labels = [default_transforms(x[0]) for x in ims], [x[1] for x in ims]
 
     s = torch.stack(tensors)
 

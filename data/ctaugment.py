@@ -15,6 +15,7 @@
 import random
 from collections import namedtuple
 import multiprocessing as mp
+import torchvision
 import ctypes
 import numpy as np
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
@@ -31,16 +32,20 @@ def register(*bins):
 
     return wrap
 
+transforms = torchvision.transforms.Compose([
+                     torchvision.transforms.ToTensor(),
+                     torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
 def apply(x, ops):
     if ops is None:
         return x
-    y = x
+    y = x.copy()
     for op, args in ops:
         y = OPS[op].f(y, *args)
     lvl = random.uniform(0, 0.5)
     y = cutout(y, lvl)
-    return (2*(np.asarray(y).astype('f') / 255 - 0.5)).transpose(2,0,1)
+    return transforms(y)
+    # return (2*(np.asarray(y).astype('f') / 255 - 0.5)).transpose(2, 0, 1)
 
 class CTAugment:
     def __init__(self, depth=2, th=0.85, decay=0.99):
