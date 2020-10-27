@@ -4,6 +4,7 @@ from tqdm import tqdm
 import argparse
 # from torch import Tensor
 # from torchvision.transforms import ToTensor
+from data.ctaugment import transforms as default_transforms
 from scheduler.cosineLRreduce import cosineLRreduce
 from torch.nn import functional as F
 from data.data import DataSet, Augmentation, CustomLoader
@@ -16,17 +17,18 @@ import os
 
 parser = argparse.ArgumentParser(description='Testing script')
 parser.add_argument('--download', type=bool, default=True)
-parser.add_argument('--root', type=str, default='~/databases/')              #sudo mkdir /home/databases and then sudo chmod -R 777 /home/databases (for permissions) 
-parser.add_argument('--save_dir', type=str, default='~/DeepLearningModels/')
-parser.add_argument('--name_model_specs', type=str, default='2020-10-23 17:51:33.557705FixMatchModel_CIFAR10_EMA.state_dict')
+parser.add_argument('--root', type=str, default='~/databases/')  
+parser.add_argument('--model_directory', type=str, default='testing/')
+parser.add_argument('--model_name', type=str, default='CIFAR10_25labels/_final_2020-10-27 01:56:22.910818FixMatchModel_CIFAR10_normal.state_dict')
 parser.add_argument('--use_database', type=str, default='CIFAR10')
 parser.add_argument('--task', type=str, default='test')
+parser.add_argument('--save_result', type=str, default='results/fres_25.npy')
 
 args = parser.parse_args()
 
 def default_collate_fn(ims):
     
-    tensors, labels = [torch.FloatTensor(np.array(x[0]).transpose(2, 0, 1))/255 for x in ims], [x[1] for x in ims]
+    tensors, labels = [default_transforms(x[0]) for x in ims], [x[1] for x in ims]
 
     s = torch.stack(tensors)
 
@@ -52,21 +54,26 @@ if __name__ == "__main__":
 
     test_loader = DataLoader(test_data, collate_fn=default_collate_fn, batch_size=64)
 
-    model_directory = os.path.expanduser(args.save_dir)
+    model_directory = os.path.expanduser(args.model_directory)
     
     model = WideResNet(3, 28, 2, 10)
-    state_dict = torch.load(os.path.join(model_directory, args.name_model_specs)) 
+    state_dict = torch.load(os.path.join(model_directory, args.model_name), map_location=torch.device(device)) 
     for k, v in state_dict.items():
         state_dict[k] = v.cpu()
     model.load_state_dict(state_dict)
 
     correct, total  = 0, 0
     model.eval()
+    saving = np.empty((0,2))
     with torch.no_grad(): #Turn off gradients
-        for X, Y in tqdm(test_loader):
+        for i, (X, Y) in tqdm(enumerate(test_loader)):
+            prediction = model(X).softmax(1).numpy()
+            confidence = np.max(prediction, axis=1).reshape(-1,1)
             y       = np.argmax(model(X).cpu().numpy(), axis=1) == Y.numpy()
+            saving = np.vstack([saving,np.hstack([confidence, y.reshape(-1,1)])])
             total  += len(y)
             correct += np.sum(y)
 
     print('Test accuracy: ', correct/total)
+    np.save(args.save_result, saving, allow_pickle=True)
     
