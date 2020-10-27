@@ -9,7 +9,7 @@ OUR PLAN:                                                                       
 
 3) threshold plot on best results                                                                                                      #   Theo
 
-4) run generalized cross entropy in some smart case (let's see the results first)                                                      #   Under debugging
+4) run generalized cross entropy in some smart case (let's see the results first)                                                      #   chosen: cIFAR10/ lpc25/ rcta5/ t0.85
 
 Estimated time to run remaining experiments: 18h starting from 17h today
 
@@ -17,25 +17,26 @@ WRITE REPORT AND INTERESTING CONCLUSIONS: this should include:
 						dataloader strategy and what we have learned from that, 
 						wideresnet initialization, 
 						generalized cross entropy, 
-						threshold plot, 
+						threshold plot,                                                                        #   ONE READY, PENDING COMPARISON
 						impact and challenges of the amount of labels for training,
 						baselines (vfdev5 and fixmatch paper) to support our conclusions,
 						other ablation studies driven from our many trials and not results reported itself,
+                                                vfdev5 graphs,
 						... 
 
 
 ######################################################################################################################################################
 ALEADY RUNNING:
 
-1) CIFAR100__25labels/class__15ctaugruns                                                                                               #    Ask Theo. Done?
+1) CIFAR100__25labels/class__15ctaugruns                                                                                               #    DONE
  
 2) CIFAR100__100labels/class__20ctaugruns                                                                                              #    DONE
 
-3) CIFAR100__25labels/class__5ctaugruns                                                                                                #    RUNNING
+3) CIFAR100__25labels/class__5ctaugruns                                                                                                #    PENDING. JOB SUBMITTED
 
-4) run CIFAR10__400labels/class__15ctaugruns                                                                                           #    PENDING. JOB SUBMITTED
+4) run CIFAR10__400labels/class__15ctaugruns                                                                                           #    RUNNING
 
-5) Genralize d cross entropy                                                                                                           #    TESTING PHASE
+5) Generalized Cross Entropy _t085_cifar10_lpc25_rcta5                                                                                 #    PENDING. JOB SUBMITTED
 
 
 
@@ -47,3 +48,4 @@ READY RESULTS:
 2) CIFAR10__4labels/class__5ctaugruns
 
 3) CIFAR100__100labels/class__20ctaugruns
+
