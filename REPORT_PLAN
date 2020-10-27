@@ -34,7 +34,7 @@ ALEADY RUNNING:
 
 3) CIFAR100__25labels/class__5ctaugruns                                                                                                #    PENDING. JOB SUBMITTED
 
-4) run CIFAR10__400labels/class__15ctaugruns                                                                                           #    RUNNING
+4) run CIFAR10__400labels/class__15ctaugruns                                                                                           #    DONE
 
 5) Generalized Cross Entropy _t085_cifar10_lpc25_rcta5                                                                                 #    PENDING. JOB SUBMITTED
 
@@ -49,3 +49,4 @@ READY RESULTS:
 
 3) CIFAR100__100labels/class__20ctaugruns
 
+4) run CIFAR10__400labels/class__15ctaugruns
