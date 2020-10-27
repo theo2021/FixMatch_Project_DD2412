@@ -1,17 +1,17 @@
 
 ######################################################################################################################################################
-OUR PLAN:
+OUR PLAN:                                                                                                                              #
+																       #
 
+1) run CIFAR10__400labels/class__15ctaugruns                                                                                           #   OK
 
-1) run CIFAR10__400labels/class__15ctaugruns
+2) run CIFAR100__25labels/class__5ctaugruns                                                                                            #   OK
 
-2) run CIFAR100__25labels/class__5ctaugruns
+3) threshold plot on best results                                                                                                      #   Theo
 
-3) threshold plot on best results 
+4) run generalized cross entropy in some smart case (let's see the results first)                                                      #   Under debugging
 
-4) run generalized cross entropy in some smart case (let's see the results first)
-
-Estimated time to run remaining experiments: 18h starting from midday today
+Estimated time to run remaining experiments: 18h starting from 17h today
 
 WRITE REPORT AND INTERESTING CONCLUSIONS: this should include: 
 						dataloader strategy and what we have learned from that, 
@@ -27,9 +27,15 @@ WRITE REPORT AND INTERESTING CONCLUSIONS: this should include:
 ######################################################################################################################################################
 ALEADY RUNNING:
 
-1) CIFAR100__25labels/class__15ctaugruns
+1) CIFAR100__25labels/class__15ctaugruns                                                                                               #    Ask Theo. Done?
+ 
+2) CIFAR100__100labels/class__20ctaugruns                                                                                              #    DONE
 
-2) CIFAR100__100labels/class__20ctaugruns
+3) CIFAR100__25labels/class__5ctaugruns                                                                                                #    RUNNING
+
+4) run CIFAR10__400labels/class__15ctaugruns                                                                                           #    PENDING. JOB SUBMITTED
+
+5) Genralize d cross entropy                                                                                                           #    TESTING PHASE
 
 
 
@@ -39,3 +45,5 @@ READY RESULTS:
 1) CIFAR10__25labels/class__15ctaugruns
 
 2) CIFAR10__4labels/class__5ctaugruns
+
+3) CIFAR100__100labels/class__20ctaugruns
