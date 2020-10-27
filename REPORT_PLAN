@@ -1,0 +1,41 @@
+
+######################################################################################################################################################
+OUR PLAN:
+
+
+1) run CIFAR10__400labels/class__15ctaugruns
+
+2) run CIFAR100__25labels/class__5ctaugruns
+
+3) threshold plot on best results 
+
+4) run generalized cross entropy in some smart case (let's see the results first)
+
+Estimated time to run remaining experiments: 18h starting from midday today
+
+WRITE REPORT AND INTERESTING CONCLUSIONS: this should include: 
+						dataloader strategy and what we have learned from that, 
+						wideresnet initialization, 
+						generalized cross entropy, 
+						threshold plot, 
+						impact and challenges of the amount of labels for training,
+						baselines (vfdev5 and fixmatch paper) to support our conclusions,
+						other ablation studies driven from our many trials and not results reported itself,
+						... 
+
+
+######################################################################################################################################################
+ALEADY RUNNING:
+
+1) CIFAR100__25labels/class__15ctaugruns
+
+2) CIFAR100__100labels/class__20ctaugruns
+
+
+
+######################################################################################################################################################
+READY RESULTS:
+
+1) CIFAR10__25labels/class__15ctaugruns
+
+2) CIFAR10__4labels/class__5ctaugruns
