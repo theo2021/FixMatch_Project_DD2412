@@ -1,6 +1,7 @@
 import torch
 from torch.nn import functional as F
 from tqdm import tqdm
+import os
 
 class fixmatch_Loss():
     
@@ -30,12 +31,14 @@ def save_models(*models, saving_dir='', prefix='current_run'):
 
 def train_fixmatch(train_loader, val_loader, model, K, augmentation, optimizer, scheduler, device, tb_writer, saving_dir='', threshold=0.95):
     lossfunc = fixmatch_Loss(threshold=threshold)
-    run_validation = 200
+    run_validation = 400
     update_bar = 20
     top_val = 0
     run_validation = 200
     with tqdm(total = K) as bar:
         for i, loader in enumerate(train_loader):
+            if i > K:
+                break
             x_weak = loader['label_samples'].to(device, non_blocking=True)
             x_labels = loader['label_targets'].to(device, non_blocking=True)
             u_weak = loader['ulabel_samples_weak'].to(device, non_blocking=True)
@@ -92,9 +95,9 @@ def train_fixmatch(train_loader, val_loader, model, K, augmentation, optimizer, 
                 print('Validation on iteration k={0} yielded {1} accuracy'.format(i, acc))
                 if acc > top_val:
                     top_val = acc
-                    save_models([model, normal], saving_dir=saving_dir)
+                    save_models([model, 'normal'], saving_dir=saving_dir)
 
-        save_models([model, normal], saving_dir=saving_dir, prefix='final')
+        save_models([model, 'normal'], saving_dir=saving_dir, prefix='final')
 
 
             
