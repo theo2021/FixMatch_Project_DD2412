@@ -123,10 +123,10 @@ class FixMatchDataset(IterableDataset):
             output['ct_labels'] = ct_batch_labels
 
         # pin memory if cuda is availiable
-        if torch.cuda.is_available():
-            for key in output.keys():
-                if torch.is_tensor(output[key]):
-                    output[key].pin_memory()
+      #  if torch.cuda.is_available():
+      #      for key in output.keys():
+      #          if torch.is_tensor(output[key]):
+      #              output[key].pin_memory()
 
         return output
         
