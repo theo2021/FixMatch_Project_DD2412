@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser(description='FixMatch_Model')
 parser.add_argument('--db_dir', type=str, default='~/databases/')
 parser.add_argument('--dataset', type=str, default='CIFAR10')
 parser.add_argument('--labels_per_class', type=int, default=4)
+parser.add_argument('threshold', type=float, dfault=0.95)
 parser.add_argument('--batch_size', type=int, default=16)
 parser.add_argument('--mu', type=int, default=7)
 parser.add_argument('--ct_augment_update', type=int, default=10)
@@ -24,7 +25,7 @@ parser.add_argument('--workers', type=int, default=6)
 parser.add_argument('--validation_percentage', type=float, default=0.1)
 parser.add_argument('--seed', type=int, default=65)
 parser.add_argument('--steps', type = int, default=2**20)
-parser.add_argument('--sheduler_steps', type = int, default=2**20)
+parser.add_argument('--scheduler_steps', type = int, default=2**20)
 parser.add_argument('--warmup_scheduler', type = float, default=0.01) #none, will to 1% of training
 parser.add_argument('--lr', type= float, default=0.03)
 parser.add_argument('--momentum', type= float, default=0.9)
@@ -55,9 +56,9 @@ val_loader = DataLoader(db_val, batch_size=args.batch_size, num_workers=2)
 # model, optimizer, scheduler
 model     = WideResNet(3, 28, 2, len(db_object.labels_per_class)).to(device)
 optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay, nesterov=args.nesterov)
-scheduler = cosineLRreduce(optimizer, args.sheduler_steps, warmup=args.warmup_scheduler)
+scheduler = cosineLRreduce(optimizer, args.scheduler_steps, warmup=args.warmup_scheduler)
 K = args.steps
 
 # TensorBoard log
 tb_writer = SummaryWriter(log_dir=args.tb_logdir)
-train_fixmatch(train_loader, val_loader, model, K, ctaug, optimizer, scheduler,device, tb_writer)
+train_fixmatch(train_loader, val_loader, model, K, ctaug, optimizer, scheduler,device, tb_writer, threshold = args.threshold)

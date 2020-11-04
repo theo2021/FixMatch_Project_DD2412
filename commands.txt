@@ -1,0 +1,4 @@
+scp -P 2222 -r /home/firedragon/GITHUB/DD2412/reorganization/ afnl@moria.csc.kth.se:/Midgard/home/afnl/DD2412_finalproj/
+
+scp -P 2222 -r afnl@moria.csc.kth.se:/Midgard/home/afnl/logs/125941_slurm.err /home/firedragon/Desktop/
+
