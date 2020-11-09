@@ -9,6 +9,7 @@ from models.wideresnet import WideResNet
 from schedulers.cosineLRreduce import cosineLRreduce
 from torch.utils.tensorboard import SummaryWriter
 from train import train_fixmatch
+from models.ema import EMA
 import os
 
 
@@ -16,7 +17,7 @@ parser = argparse.ArgumentParser(description='FixMatch_Model')
 parser.add_argument('--db_dir', type=str, default='~/databases/')
 parser.add_argument('--dataset', type=str, default='CIFAR10')
 parser.add_argument('--labels_per_class', type=int, default=4)
-parser.add_argument('threshold', type=float, dfault=0.95)
+parser.add_argument('--threshold', type=float, default=0.95)
 parser.add_argument('--batch_size', type=int, default=16)
 parser.add_argument('--mu', type=int, default=7)
 parser.add_argument('--ct_augment_update', type=int, default=10)
@@ -33,6 +34,7 @@ parser.add_argument('--nesterov', type= bool, default=True)
 parser.add_argument('--weight_decay', type= float, default=0.0005)
 parser.add_argument('--model_save_dir', type= str, default="FixMatch_models")
 parser.add_argument('--tb_logdir', type= str, default="tensorboard_log")
+parser.add_argument('--ema', type=bool, default=True)
 args = parser.parse_args()
 
 # create folders if they don't exist
@@ -55,10 +57,14 @@ val_loader = DataLoader(db_val, batch_size=args.batch_size, num_workers=2)
 
 # model, optimizer, scheduler
 model     = WideResNet(3, 28, 2, len(db_object.labels_per_class)).to(device)
+if args.ema:
+    ema = EMA(model)
+else:
+    ema=None
 optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay, nesterov=args.nesterov)
 scheduler = cosineLRreduce(optimizer, args.scheduler_steps, warmup=args.warmup_scheduler)
 K = args.steps
 
 # TensorBoard log
 tb_writer = SummaryWriter(log_dir=args.tb_logdir)
-train_fixmatch(train_loader, val_loader, model, K, ctaug, optimizer, scheduler,device, tb_writer, threshold = args.threshold)
+train_fixmatch(train_loader, val_loader, model, K, ctaug, optimizer, scheduler,device, tb_writer, threshold = args.threshold, ema=ema)

@@ -29,16 +29,21 @@ def save_models(*models, saving_dir='', prefix='current_run'):
         torch.save(model.state_dict(), os.path.join(save_dir, prefix + '_' + name + '.state_dict'))
 
 
-def train_fixmatch(train_loader, val_loader, model, K, augmentation, optimizer, scheduler, device, tb_writer, saving_dir='', threshold=0.95):
+def train_fixmatch(train_loader, val_loader, model, K, augmentation, optimizer, scheduler, device, tb_writer, ema=None, saving_dir='', threshold=0.95):
     lossfunc = fixmatch_Loss(threshold=threshold)
     run_validation = 400
     update_bar = 20
     top_val = 0
     run_validation = 200
+    warmup = True
     with tqdm(total = K) as bar:
         for i, loader in enumerate(train_loader):
             if i > K:
                 break
+            if scheduler.state == 2 and (ema is not None) and warmup:
+                ema.register()
+                warmup = False
+                
             x_weak = loader['label_samples'].to(device, non_blocking=True)
             x_labels = loader['label_targets'].to(device, non_blocking=True)
             u_weak = loader['ulabel_samples_weak'].to(device, non_blocking=True)
@@ -58,7 +63,8 @@ def train_fixmatch(train_loader, val_loader, model, K, augmentation, optimizer, 
             t_loss.backward()
             optimizer.step()
             scheduler.step()
-
+            if warmup == False:
+                ema.update()
             if i > 0 and i % update_bar == 0: 
                 tb_writer.add_scalar('Loss/train', t_loss, i)
                 tb_writer.add_scalar('SupervisedLoss/train', s_loss, i)
@@ -98,6 +104,8 @@ def train_fixmatch(train_loader, val_loader, model, K, augmentation, optimizer, 
                     save_models([model, 'normal'], saving_dir=saving_dir)
 
         save_models([model, 'normal'], saving_dir=saving_dir, prefix='final')
+        ema.apply_shadow()
+        save_models([model, 'ema'], saving_dir=saving_dir, prefix='final')
 
 
             
