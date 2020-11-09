@@ -140,3 +140,29 @@ class FixMatchDataset(IterableDataset):
 # for s in db:
 #     print(s)
 # print(random)
+
+class FixMatchTestDataset(Dataset):
+    def __init__(self, dataset, replace=False, mean=[125, 125, 125], std=[63,63,63], augmentation=False):
+        super().__init__()
+        self.standard_transform = torchvision.transforms.Compose([
+                     torchvision.transforms.ToTensor(),
+                     torchvision.transforms.Normalize(mean/255, std/255)])
+        self.weak_transform = torchvision.transforms.Compose([
+            torchvision.transforms.RandomHorizontalFlip(p=0.5),
+            torchvision.transforms.RandomAffine(0, translate=(0.125, 0.125)),
+            self.standard_transform])
+        self.dataset = dataset
+        self.classes = np.unique([sample[1] for sample in dataset]).shape[0]
+        self.aug = augmentation 
+
+    def __getitem__(self, i):
+        x, y = self.dataset[i]
+        if self.aug:
+            return self.weak_transform(x), y
+        else:
+            return self.standard_transform(x), y
+    
+    def __len__(self):
+        return len(self.dataset)
+        
+
