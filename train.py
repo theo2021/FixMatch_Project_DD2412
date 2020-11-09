@@ -104,8 +104,9 @@ def train_fixmatch(train_loader, val_loader, model, K, augmentation, optimizer, 
                     save_models([model, 'normal'], saving_dir=saving_dir)
 
         save_models([model, 'normal'], saving_dir=saving_dir, prefix='final')
-        ema.apply_shadow()
-        save_models([model, 'ema'], saving_dir=saving_dir, prefix='final')
+        if warmup == False:
+            ema.apply_shadow()
+            save_models([model, 'ema'], saving_dir=saving_dir, prefix='final')
 
 
             
