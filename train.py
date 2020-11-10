@@ -4,12 +4,6 @@ from tqdm import tqdm
 import os
 from loss_functions.LqLoss import LqLoss
 
-def function_selection(f_string, arg):
-    functions_dict = {
-        'cross': lambda pred, labels : F.cross_entropy(pred, labels, reduction='sum'),
-        'gcross': LqLoss(q=lqloss_tresh)
-    }
-
 
 class fixmatch_Loss():
     
