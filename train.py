@@ -2,12 +2,22 @@ import torch
 from torch.nn import functional as F
 from tqdm import tqdm
 import os
+from loss_functions.LqLoss import LqLoss
+
+def function_selection(f_string, arg):
+    functions_dict = {
+        'cross': lambda pred, labels : F.cross_entropy(pred, labels, reduction='sum'),
+        'gcross': LqLoss(q=lqloss_tresh)
+    }
+
 
 class fixmatch_Loss():
     
-    def __init__(self, l=1, threshold=0.95):
+    def __init__(self, sup_func, unsup_func, l=1, threshold=0.95):
         self.u_weight          = l
         self.tau               = threshold
+        self.sup = sup_func
+        self.usup = unsup_func
 
     def get_pseudo(self, unlabeled_weak_predictions):
         max_pred, pseudolabels = unlabeled_weak_predictions.softmax(1).max(axis=1)
@@ -15,9 +25,9 @@ class fixmatch_Loss():
         return indexes_over_threshold, pseudolabels
 
     def calculate_losses(self, labeled_prediction, labeled_labels, unlabeled_strong_predictions, pseudolabels, usize):
-        supervised = F.cross_entropy(labeled_prediction, labeled_labels)
+        supervised = self.sup(labeled_prediction, labeled_labels)
         if pseudolabels.size()[0] > 0:
-            unsupervised = F.cross_entropy(unlabeled_strong_predictions, pseudolabels, reduction='sum')/usize
+            unsupervised = self.usup(unlabeled_strong_predictions, pseudolabels)/usize
         else:
             unsupervised = 0
         return supervised + self.u_weight*unsupervised, supervised, unsupervised
@@ -29,8 +39,12 @@ def save_models(*models, saving_dir='', prefix='current_run'):
         torch.save(model.state_dict(), os.path.join(save_dir, prefix + '_' + name + '.state_dict'))
 
 
-def train_fixmatch(train_loader, val_loader, model, K, augmentation, optimizer, scheduler, device, tb_writer, ema=None, saving_dir='', threshold=0.95):
-    lossfunc = fixmatch_Loss(threshold=threshold)
+def train_fixmatch(train_loader, val_loader, model, K, augmentation, optimizer, scheduler, device, tb_writer, ema=None, saving_dir='', threshold=0.95, lqloss_tresh=0.7, loss_functions='cross,cross'):
+    lqloss = LqLoss(q=lqloss_tresh)
+    sel = loss_functions.split(',')
+    sup_func = F.cross_entropy if sel[0] == 'cross' else (lambda p,l: lqloss(p,l)/len(l))
+    unsup_func = (lambda p,l: F.cross_entropy(p, l, reduction='sum')) if sel[1] == 'cross' else lqloss
+    lossfunc = fixmatch_Loss(sup_func, unsup_func, threshold=threshold)
     run_validation = 400
     update_bar = 20
     top_val = 0

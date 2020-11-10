@@ -34,6 +34,8 @@ parser.add_argument('--nesterov', type= bool, default=True)
 parser.add_argument('--weight_decay', type= float, default=0.0005)
 parser.add_argument('--model_save_dir', type= str, default="FixMatch_models")
 parser.add_argument('--tb_logdir', type= str, default="tensorboard_log")
+parser.add_argument('--loss_func', type= str, default="cross,cross")
+parser.add_argument('--gcross_thresh', type= float, default=0.7)
 parser.add_argument('--ema', type=bool, default=True)
 args = parser.parse_args()
 
@@ -67,4 +69,4 @@ K = args.steps
 
 # TensorBoard log
 tb_writer = SummaryWriter(log_dir=args.tb_logdir)
-train_fixmatch(train_loader, val_loader, model, K, ctaug, optimizer, scheduler,device, tb_writer, threshold = args.threshold, ema=ema)
+train_fixmatch(train_loader, val_loader, model, K, ctaug, optimizer, scheduler,device, tb_writer, threshold = args.threshold, ema=ema, saving_dir=args.model_save_dir, lqloss_tresh=args.gcross_thresh, loss_functions=args.loss_func)
