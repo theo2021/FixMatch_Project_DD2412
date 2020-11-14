@@ -39,7 +39,7 @@ class default_loader(Dataset):
         return len(self.dataset)
 
 class FixMatchDataset(IterableDataset):
-    def __init__(self, dataset, labels_per_class, batch_size, mu, seed=65, replace=False, mean=[125, 125, 125], std=[63,63,63], augmentation=CTAugment(), ct_update=1, ct_batch=32):
+    def __init__(self, dataset, labels_per_class, batch_size, mu, augmentation, seed=65, replace=False, mean=[125, 125, 125], std=[63,63,63], ct_update=1, ct_batch=32):
         super().__init__()
         self.dataset = dataset
         self.batch_size = batch_size

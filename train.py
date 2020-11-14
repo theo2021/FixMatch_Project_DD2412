@@ -39,16 +39,16 @@ def train_fixmatch(train_loader, val_loader, model, K, augmentation, optimizer, 
     sup_func = F.cross_entropy if sel[0] == 'cross' else (lambda p,l: lqloss(p,l)/len(l))
     unsup_func = (lambda p,l: F.cross_entropy(p, l, reduction='sum')) if sel[1] == 'cross' else lqloss
     lossfunc = fixmatch_Loss(sup_func, unsup_func, threshold=threshold)
-    run_validation = 400
-    update_bar = 20
+    run_validation = 500
+    update_bar = 50
     top_val = 0
-    run_validation = 200
     warmup = True
     with tqdm(total = K) as bar:
         for i, loader in enumerate(train_loader):
             if i > K:
                 break
             if scheduler.state == 2 and (ema is not None) and warmup:
+                print("Warmup ended, initializing ema")
                 ema.register()
                 warmup = False
                 
@@ -63,7 +63,6 @@ def train_fixmatch(train_loader, val_loader, model, K, augmentation, optimizer, 
                 indexes, pseudolabels = lossfunc.get_pseudo(unlabeled_predictions)
             
             optimizer.zero_grad()
-            strongly_augmented_selected = u_strong[indexes]
             p_num = indexes.sum()
             labeled_predictions = model(x_weak)
             unlabeled_strong_predictions = model(u_strong)
@@ -110,11 +109,13 @@ def train_fixmatch(train_loader, val_loader, model, K, augmentation, optimizer, 
                 if acc > top_val:
                     top_val = acc
                     save_models([model, 'normal'], saving_dir=saving_dir)
+                    augmentation.save_rates('current')
 
         save_models([model, 'normal'], saving_dir=saving_dir, prefix='final')
         if warmup == False:
             ema.apply_shadow()
             save_models([model, 'ema'], saving_dir=saving_dir, prefix='final')
+        augmentation.save_rates('final')
 
 
             

@@ -4,15 +4,16 @@ import math
 
 class cosineLRreduce(_LRScheduler):
 
-    def __init__(self, optimizer, K, warmup=None):
+    def __init__(self, optimizer, K, warmup=None, from_step=0):
         self.optimizer = optimizer
         self.K = K
+        self.start_from = from_step
         self.warm = 1.0*K/100 if warmup is None else warmup*K # default 1/100 of total training
         self.state = 0 # indicates state, 0 init, 1 warmup, 2 cosine
         super(cosineLRreduce, self).__init__(optimizer)
 
     def get_lr(self):
-        c_step = max(1, self._step_count)
+        c_step = max(1, self._step_count + self.start_from)
         if c_step > self.K:
             print("scheduler error, k > K")
             return [base_lr/(2**10) for base_lr in self.base_lrs] # if error return very small learning rate

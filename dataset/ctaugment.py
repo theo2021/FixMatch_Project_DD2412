@@ -13,10 +13,12 @@
 # limitations under the License.
 """Control Theory based self-augmentation."""
 import random
+import pickle
 from collections import namedtuple
 import multiprocessing as mp
 import torchvision
 import ctypes
+import os
 import numpy as np
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
@@ -45,16 +47,29 @@ def apply(x, ops):
     # return (2*(np.asarray(y).astype('f') / 255 - 0.5)).transpose(2, 0, 1)
 
 class CTAugment:
-    def __init__(self, depth=2, th=0.85, decay=0.99):
+    def __init__(self, saving_dir, depth=2, th=0.85, decay=0.99):
         self.decay = decay
         self.depth = depth
         self.th = th
+        self.saving_dir = saving_dir
         self.manager = mp.Manager()
         self.rates = self.manager.dict()
         # self.rates = {}
         for k, op in OPS.items():
             # self.rates[k] = tuple([np.ctypeslib.as_array(mp.Array(ctypes.c_float, [1 for i in range(x)])) for x in op.bins])
             self.rates[k] = tuple([np.ones(x, 'f') for x in op.bins])
+
+    def save_rates(self, prefix=''):
+        rates = dict(self.rates)
+        a_file = open(os.path.join(self.saving_dir, prefix + "_cta_rates.pickle"), "wb")
+        pickle.dump(rates, a_file)
+        a_file.close()
+
+    def load_rates(self, directory):
+        a_file = open(directory, "rb")
+        rates = pickle.load(a_file)
+        self.rates.update(rates)
+        a_file.close()
 
     def rate_to_p(self, rate):
         p = rate + (1 - self.decay)
