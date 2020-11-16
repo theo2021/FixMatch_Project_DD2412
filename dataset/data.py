@@ -38,6 +38,33 @@ class default_loader(Dataset):
     def __len__(self):
         return len(self.dataset)
 
+class CustomCollateClass:
+    def __init__(self, data):
+        self.label_samples = data['label_samples']
+        self.label_targets = data['label_targets']
+        self.ulabel_samples_weak = data['ulabel_samples_weak']
+        self.ulabel_samples_strong = data['ulabel_samples_strong']
+        if 'policies' in data.keys():
+            self.policies = data['policies']
+            self.ct_samples = data['ct_samples']
+            self.ct_labels = data['ct_labels']
+
+    def __getitem__(self, attr):
+        return self.__getattribute__(attr)
+
+    def keys(self):
+        return dir(self)
+
+    def pin_memory(self):
+        self.label_samples = self.label_samples.pin_memory()
+        self.label_targets = self.label_targets.pin_memory()
+        self.ulabel_samples_weak = self.ulabel_samples_weak.pin_memory()
+        self.ulabel_samples_strong = self.ulabel_samples_strong.pin_memory()
+        return self
+
+def collate_wrapper(batch):
+    return CustomCollateClass(batch)
+
 class FixMatchDataset(IterableDataset):
     def __init__(self, dataset, labels_per_class, batch_size, mu, augmentation, seed=65, replace=False, mean=[125, 125, 125], std=[63,63,63], ct_update=1, ct_batch=32):
         super().__init__()
