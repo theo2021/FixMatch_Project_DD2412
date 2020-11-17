@@ -77,28 +77,34 @@ class CTAugment:
         p[p < self.th] = 0
         return p
 
-    def policy(self, probe):
+    def policy(self, probe, nums=1):
+        rates = dict(self.rates)
+        policies = []
         kl = list(OPS.keys())
-        v = []
-        if probe:
+        for n in range(nums):
+            v = []
+            if probe:
+                for _ in range(self.depth):
+                    k = random.choice(kl)
+                    bins = rates[k]
+                    rnd = np.random.uniform(0, 1, len(bins))
+                    v.append(OP(k, rnd.tolist()))
+                return v
             for _ in range(self.depth):
+                vt = []
                 k = random.choice(kl)
-                bins = self.rates[k]
+                bins = rates[k]
                 rnd = np.random.uniform(0, 1, len(bins))
-                v.append(OP(k, rnd.tolist()))
-            return v
-        for _ in range(self.depth):
-            vt = []
-            k = random.choice(kl)
-            bins = self.rates[k]
-            rnd = np.random.uniform(0, 1, len(bins))
-            for r, bin in zip(rnd, bins):
-                p = self.rate_to_p(bin)
-                segments = p[1:] + p[:-1]
-                segment = np.random.choice(segments.shape[0], p=segments / segments.sum())
-                vt.append((segment + r) / segments.shape[0])
-            v.append(OP(k, vt))
-        return v
+                for r, bin in zip(rnd, bins):
+                    p = self.rate_to_p(bin)
+                    segments = p[1:] + p[:-1]
+                    segment = np.random.choice(segments.shape[0], p=segments / segments.sum())
+                    vt.append((segment + r) / segments.shape[0])
+                v.append(OP(k, vt))
+            policies.append(v)
+        if nums == 1:
+            return policies[0]
+        return policies
 
     def update_rates(self, policy, accuracy):
         rates = dict(self.rates)
