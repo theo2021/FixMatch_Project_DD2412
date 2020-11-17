@@ -1,5 +1,5 @@
 import torch
-from dataset.data import FixMatchDataset, fetch_dataset, default_loader
+from dataset.data import FixMatchDataset, fetch_dataset, default_loader, collate_wrapper
 from dataset.ctaugment import CTAugment
 from torch.utils.data import DataLoader
 import argparse
@@ -40,6 +40,7 @@ parser.add_argument('--ema', type=bool, default=True)
 parser.add_argument('--sheduler_from_step', type=int, default=0)
 parser.add_argument('--load_model', type=str, default='')
 parser.add_argument('--cta_load', type=str, default='')
+parser.add_argument('--loss_lambda', type=int, default=1)
 args = parser.parse_args()
 
 # create folders if they don't exist
@@ -62,7 +63,7 @@ print('Train / Validation Set', len(dataset_train), len(dataset_val))
 db_object = FixMatchDataset(dataset_train, labels_per_class=args.labels_per_class, batch_size=args.batch_size, mu=args.mu, seed=args.seed, replace=False, mean=mean, std=std, augmentation=ctaug, ct_update=args.ct_augment_update, ct_batch=args.ct_augment_batch_size)
 db_val = default_loader(dataset_val,  mean=mean, std=std)
 # Dataloaders
-train_loader = DataLoader(db_object, batch_size=None, num_workers=args.workers)
+train_loader = DataLoader(db_object, batch_size=None, num_workers=args.workers, collate_fn=collate_wrapper)
 val_loader = DataLoader(db_val, batch_size=args.batch_size, num_workers=2)
 
 # model, optimizer, scheduler
@@ -83,4 +84,4 @@ K = args.steps
 
 # TensorBoard log
 tb_writer = SummaryWriter(log_dir=tb_logdir)
-train_fixmatch(train_loader, val_loader, model, K, ctaug, optimizer, scheduler,device, tb_writer, threshold = args.threshold, ema=ema, saving_dir=model_save_dir, lqloss_tresh=args.gcross_thresh, loss_functions=args.loss_func)
+train_fixmatch(train_loader, val_loader, model, K, ctaug, optimizer, scheduler,device, tb_writer, threshold = args.threshold, ema=ema, saving_dir=model_save_dir, lqloss_tresh=args.gcross_thresh, loss_functions=args.loss_func, loss_lambda=args.loss_lambda)

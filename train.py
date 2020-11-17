@@ -33,12 +33,12 @@ def save_models(*models, saving_dir='', prefix='current_run'):
         torch.save(model.state_dict(), os.path.join(save_dir, prefix + '_' + name + '.state_dict'))
 
 
-def train_fixmatch(train_loader, val_loader, model, K, augmentation, optimizer, scheduler, device, tb_writer, saving_dir, ema=None, threshold=0.95, lqloss_tresh=0.7, loss_functions='cross,cross'):
+def train_fixmatch(train_loader, val_loader, model, K, augmentation, optimizer, scheduler, device, tb_writer, saving_dir, ema=None, threshold=0.95, lqloss_tresh=0.7, loss_lambda=1, loss_functions='cross,cross'):
     lqloss = LqLoss(q=lqloss_tresh)
     sel = loss_functions.split(',')
     sup_func = F.cross_entropy if sel[0] == 'cross' else (lambda p,l: lqloss(p,l)/len(l))
     unsup_func = (lambda p,l: F.cross_entropy(p, l, reduction='sum')) if sel[1] == 'cross' else lqloss
-    lossfunc = fixmatch_Loss(sup_func, unsup_func, threshold=threshold)
+    lossfunc = fixmatch_Loss(sup_func, unsup_func, threshold=threshold, l=loss_lambda)
     run_validation = 500
     update_bar = 50
     top_val = 0
