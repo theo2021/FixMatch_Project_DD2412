@@ -121,13 +121,13 @@ class FixMatchDataset(IterableDataset):
             l_batch[i] = self.weak_transform(im)
         l_batch = torch.stack(l_batch)
         output = {'label_samples': l_batch, 'label_targets': l_batch_labels}
-
+        sample_policy = self.aug.policy(False, self.batch_size*self.mu)
         u_batch = [None]*self.batch_size*self.mu
         u_batch_weak = [None]*self.batch_size*self.mu
         for i, ind in enumerate(ulabel_set):
             im, lbl = self.dataset[ind]
-            sample_policy = self.aug.policy(False)
-            u_batch[i] = self.standard_transform(apply(im, sample_policy))
+            #sample_policy = self.aug.policy(False)
+            u_batch[i] = self.standard_transform(apply(im, sample_policy[i]))
             u_batch_weak[i] = self.weak_transform(im)
         output['ulabel_samples_strong'] = torch.stack(u_batch)
         output['ulabel_samples_weak'] = torch.stack(u_batch_weak)
@@ -136,14 +136,12 @@ class FixMatchDataset(IterableDataset):
             # return ct_update info
             ct_set = np.random.choice(self.labeled_indexes, self.ct_batch)
             ct_batch = [None]*self.ct_batch
-            policies = [None]*self.ct_batch
             ct_batch_labels = torch.zeros(self.ct_batch, dtype=torch.long)
+            policies = self.aug.policy(True, self.ct_batch)
             for i, ind in enumerate(ct_set):
                 im, lbl = self.dataset[ind]
                 ct_batch_labels[i] = lbl
-                sample_policy = self.aug.policy(True)
-                policies[i] = sample_policy
-                ct_batch[i] = self.standard_transform(apply(im, sample_policy))
+                ct_batch[i] = self.standard_transform(apply(im, policies[i]))
             ct_batch = torch.stack(ct_batch)
             output['ct_samples'] = ct_batch
             output['policies'] = policies
