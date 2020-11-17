@@ -89,7 +89,7 @@ class CTAugment:
                     bins = rates[k]
                     rnd = np.random.uniform(0, 1, len(bins))
                     v.append(OP(k, rnd.tolist()))
-                return v
+                policies.append(v)
             for _ in range(self.depth):
                 vt = []
                 k = random.choice(kl)
